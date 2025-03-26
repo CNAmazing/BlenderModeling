@@ -4,13 +4,19 @@ import math
 import cv2
 import numpy as np  
 import json
-
+import os
 from BlenderScripts import *
 
 try:
     from Hw_Tools import *
 except ImportError:
     pass
+def ensure_directory_exists(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
+        print(f"目录 '{path}' 已创建。")
+    else:
+        print(f"目录 '{path}' 已存在。")
 def areaA_to_areaB_AffineTransform_By_points(pts_a,pts_b,a,b):
     M = cv2.getAffineTransform(pts_a, pts_b)
 
@@ -32,6 +38,24 @@ def areaA_to_areaB_AffineTransform_By_points(pts_a,pts_b,a,b):
     b = cv2.add(b, result)  # 将结果添加到图像 b 中
     return b
 # 获取纹理图像的尺寸
+def project_points_to_plane(points, n, Q):
+    """
+    将一组点投影到平面
+    :param points: 待投影的点集，形状为 (N, 3) 的数组
+    :param n: 平面法向量（无需单位向量，函数内会归一化）
+    :param Q: 平面中心点，形状 (3,)
+    :return: 投影后的点集，形状 (N, 3)
+    """
+    n_normalized = n / np.linalg.norm(n)  # 归一化法向量
+    Q = np.array(Q)
+    points = np.array(points)
+    
+    # 计算投影
+    vectors = points - Q  # 点相对于平面中心的向量
+    distances = np.dot(vectors, n_normalized)  # 点乘得到有符号距离
+    projected_points = points - distances[:, np.newaxis] * n_normalized
+    
+    return projected_points
 def save_texture_for_faces(mesh, face_indices, texture_image, output_path):
     width, height = texture_image.size
     texture_pixels = np.array(texture_image.pixels).reshape((height, width, 4))
@@ -137,6 +161,7 @@ def generate_FacadeTexture(mesh,texture_image,poly_Information):
     actual_Height = poly_Information['poly_ActualSize'][1]
     face_idxs = poly_Information['faces_idx']
     origin = poly_Information['origin']
+    center=poly_Information['center']
     R=poly_Information['basis']
     texture_pixels = np.array(texture_image.pixels).reshape((height, width, 4))
     texture_pixels = texture_pixels[::-1]
@@ -165,7 +190,9 @@ def generate_FacadeTexture(mesh,texture_image,poly_Information):
         
         # uvs = np.array([np.array(uv_layer.data[loop_index].uv) for loop_index in face.loop_indices])
         poly_points = []
-        for point in vertex_coords:
+        print("vertex_coords:",vertex_coords)
+        vertex_coords_projected = project_points_to_plane(vertex_coords, R[2], center)
+        for point in vertex_coords_projected:
             x_pixel,y_pixel = point_To_pixelUV( point=point, 
                                                 actual_Height=actual_Height,
                                                 actual_Width=actual_Width,
@@ -175,8 +202,14 @@ def generate_FacadeTexture(mesh,texture_image,poly_Information):
                                                 R=R)
             poly_points.append([x_pixel, y_pixel])
         uv_points = [[uv[0] * width, uv[1] * height] for uv in uvs]
+
+        poly_points=[[[p_uv[0], poly_Height - p_uv[1]] for p_uv in poly_points]]
+        uv_points=[[[p_uv[0], height - p_uv[1]] for p_uv in uv_points]]
+        print("poly_points:",poly_points)
+        print("uv_points:",uv_points)
         poly_points = np.float32(poly_points)                                       
-        uv_points = np.float32(uv_points)        
+        uv_points = np.float32(uv_points)  
+
         """
         uv_points: 原始纹理坐标点
         poly_points: 多边形坐标点
@@ -184,119 +217,136 @@ def generate_FacadeTexture(mesh,texture_image,poly_Information):
         FacadeTexture=areaA_to_areaB_AffineTransform_By_points(uv_points, poly_points,  texture_pixels_bgr,FacadeTexture)
     return FacadeTexture    
 
-        # u_min = min(uv[0] for uv in uvs)
-        # u_max = max(uv[0] for uv in uvs)
-        # v_min = min(uv[1] for uv in uvs)
-        # v_max = max(uv[1] for uv in uvs)
+def main():
+    output_path = "output"
+    obj_name = "Cube"
+    # 确保在对象模式下
+    bpy.ops.object.mode_set(mode='OBJECT')
+    # 获取名为“x”的物体
+    obj = bpy.data.objects.get(obj_name)
+    if obj is None:
+        raise ValueError(f"未找到名为{obj_name} 的物体")
+    # 确保物体是网格类型
+    if obj.type != 'MESH':
+        raise ValueError("物体不是网格类型")
+    mesh = obj.data
+    # 确保物体有材质
+    if not mesh.materials:
+        material = bpy.data.materials.new(name="RandomColor")
+        mesh.materials.append(material)
+
+    # 遍历每个面片
+    polygons_Parameterization={}
+    poly_idx=0
+    total_face_Set=set() 
+    for face in mesh.polygons:
+        
+        current_face_Set=set()
+        current_edge_Set=set()
+        normal=face.normal
+        if not face_select_by_normal(normal) or face.index in total_face_Set:
+            continue
+        current_face_Set.add(face.index)
+        total_face_Set.add(face.index)
+        for edge in face.edge_keys:
+            current_edge_Set.add(edge)
+        last_len=len(current_face_Set)
+        current_len=0
+        """
+        通过区域生长算法，找到所有与当前面片法向量相似的面片
+        """
+        while last_len!=current_len:
+            last_len=len(current_face_Set)
+            for f in mesh.polygons:
+                if f.index in current_face_Set:
+                    continue
+                for edge in f.edge_keys:
+                    if edge in current_edge_Set and is_normals_similar(f.normal,normal):
+                        current_face_Set.add(f.index)
+                        total_face_Set.add(f.index)
+                        for e in f.edge_keys:
+                            current_edge_Set.add(e)
+                        
+            current_len=len(current_face_Set)
+        
+        
+        y_axis=np.array([0,0,1])
+        z_axis=normal
+        x_axis=np.cross(y_axis,z_axis) 
+        
+        x_axis=x_axis/np.linalg.norm(x_axis)
+        y_axis=y_axis/np.linalg.norm(y_axis)
+        z_axis = z_axis/np.linalg.norm(z_axis)
+        x_min=float("inf")
+        x_max=float("-inf")
+        y_min=float("inf")
+        y_max=float("-inf")
+        for c_face in current_face_Set:
+            polygon = mesh.polygons[c_face]
+            vertices = np.array([np.array(mesh.vertices[idx].co) for idx in polygon.vertices])
+            print("vertices:",vertices)
+            vertices_projected = project_points_to_plane(vertices, z_axis, face.center)
+            for vertex in vertices_projected:
+                x,y,z=vertex
+                u = np.dot([x,y,z], x_axis)
+                v = np.dot([x,y,z], y_axis)
+                x_min = min(x_min, u)
+                x_max = max(x_max, u)
+                y_min = min(y_min, v)
+                y_max = max(y_max, v)
+            # for vertex_idx in polygon.vertices:
+            #     x,y,z=mesh.vertices[vertex_idx].co
+            #     point=np.array([x,y,z])
+            #     center=face.center
+            #     u = np.dot([x,y,z], x_axis)
+            #     v = np.dot([x,y,z], y_axis)
+            #     x_min = min(x_min, u)
+            #     x_max = max(x_max, u)
+            #     y_min = min(y_min, v)
+            #     y_max = max(y_max, v)
+            
+        actual_width = x_max - x_min
+        actual_height = y_max - y_min
+        
+        if actual_width>actual_height:
+            poly_Width=640
+            poly_Height=int(poly_Width*actual_height/actual_width)
+        else:
+            poly_Height=640
+            poly_Width=int(poly_Height*actual_width/actual_height)
+        
+        origin=tuple([x_min,y_min])
+        print("origin:",origin)
+        polygons_Parameterization[f'poly{str(poly_idx)}']={
+            "origin":origin,
+            "center":tuple(face.center),
+            'poly_ActualSize':(actual_width,actual_height),
+            'poly_ImageSize':(poly_Width,poly_Height),
+            'basis':tuple([list(x_axis),list(y_axis),list(z_axis)]),
+            "faces_idx":tuple(current_face_Set),
+            "edges_idx":tuple(current_edge_Set)
+        }
+
+        poly_idx+=1
         
 
+    print("polygons_Parameterization:",polygons_Parameterization)
+    texture_image = get_texture_image_by_object(obj)
+    ensure_directory_exists(os.path.join(output_path,obj_name,"images"))
+    if texture_image:
+        for key,value in polygons_Parameterization.items():
+            # save_texture_for_faces(mesh, value['faces_idx'], texture_image, f"{key}.png")
+            FacadeTexture=generate_FacadeTexture(mesh,texture_image,value)
+            print(f"当前将保存{key}")
+            polyImageName=os.path.join(output_path,obj_name,"images",f"{key}.jpg")
+            cv2.imwrite(polyImageName, FacadeTexture)
+    json_path=os.path.join(output_path,obj_name,"data.json")
+    with open(json_path, "w") as json_file:
+            json.dump(polygons_Parameterization, json_file, indent=4)
 
-        # u_min_all = max(min(u_min_all, u_min),0)
-        # u_max_all = min(max(u_max_all, u_max),1)
-        # v_min_all = max(min(v_min_all, v_min),0)
-        # v_max_all = min(max(v_max_all, v_max),1)
 
-# 确保在对象模式下
-bpy.ops.object.mode_set(mode='OBJECT')
-# 获取名为“x”的物体
-obj = bpy.data.objects.get("Cube")
-if obj is None:
-    raise ValueError("未找到名为 'Cube' 的物体")
-# 确保物体是网格类型
-if obj.type != 'MESH':
-    raise ValueError("物体不是网格类型")
-mesh = obj.data
-# 确保物体有材质
-if not mesh.materials:
-    material = bpy.data.materials.new(name="RandomColor")
-    mesh.materials.append(material)
 
-# 遍历每个面片
-polygons_Parameterization={}
-poly_idx=0
-total_face_Set=set() 
-for face in mesh.polygons:
-    
-    current_face_Set=set()
-    current_edge_Set=set()
-    normal=face.normal
-    if not face_select_by_normal(normal) or face.index in total_face_Set:
-        continue
-    current_face_Set.add(face.index)
-    total_face_Set.add(face.index)
-    for edge in face.edge_keys:
-        current_edge_Set.add(edge)
-    last_len=len(current_face_Set)
-    current_len=0
-    """
-    通过区域生长算法，找到所有与当前面片法向量相似的面片
-    """
-    while last_len!=current_len:
-        last_len=len(current_face_Set)
-        for f in mesh.polygons:
-            if f.index in current_face_Set:
-                continue
-            for edge in f.edge_keys:
-                if edge in current_edge_Set and is_normals_similar(f.normal,normal):
-                    current_face_Set.add(f.index)
-                    total_face_Set.add(f.index)
-                    for e in f.edge_keys:
-                        current_edge_Set.add(e)
-                    
-        current_len=len(current_face_Set)
-    
-    
-    y_axis=np.array([0,0,1])
-    z_axis=normal
-    x_axis=np.cross(y_axis,z_axis) 
-      
-    x_axis=x_axis/np.linalg.norm(x_axis)
-    y_axis=y_axis/np.linalg.norm(y_axis)
-    z_axis = z_axis/np.linalg.norm(z_axis)
-    x_min=float("inf")
-    x_max=float("-inf")
-    y_min=float("inf")
-    y_max=float("-inf")
-    for c_face in current_face_Set:
-        polygon = mesh.polygons[c_face]
-        # vertices = [mesh.vertices[idx].co for idx in polygon.vertices]
-        for vertex_idx in polygon.vertices:
-            x,y,z=mesh.vertices[vertex_idx].co
-            u = np.dot([x,y,z], x_axis)
-            v = np.dot([x,y,z], y_axis)
-            x_min = min(x_min, u)
-            x_max = max(x_max, u)
-            y_min = min(y_min, v)
-            y_max = max(y_max, v)
-    actual_width = x_max - x_min
-    actual_height = y_max - y_min
-    
-    if actual_width>actual_height:
-        poly_Width=640
-        poly_Height=int(poly_Width*actual_height/actual_width)
-    else:
-        poly_Height=640
-        poly_Width=int(poly_Height*actual_width/actual_height)
-    
-    origin=tuple([x_min,y_min])
-    polygons_Parameterization[f'poly{str(poly_idx)}']={
-        "origin":origin,
-        'poly_ActualSize':(actual_width,actual_height),
-        'poly_ImageSize':(poly_Width,poly_Height),
-        'basis':tuple([list(x_axis),list(y_axis),list(z_axis)]),
-        "faces_idx":tuple(current_face_Set),
-        "edges_idx":tuple(current_edge_Set)
-    }
 
-    poly_idx+=1
-    
 
-print("polygons_Parameterization:",polygons_Parameterization)
-texture_image = get_texture_image_by_object(obj)
-if texture_image:
-    for key,value in polygons_Parameterization.items():
-        # save_texture_for_faces(mesh, value['faces_idx'], texture_image, f"{key}.png")
-        FacadeTexture=generate_FacadeTexture(mesh,texture_image,value)
-        cv2.imwrite(f"{key}.jpg", FacadeTexture)
-# with open(f"data.json", "w") as json_file:
-#         json.dump(polygons_Parameterization, json_file, indent=4)
+
+main()

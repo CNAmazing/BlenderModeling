@@ -10,7 +10,7 @@ try:
 except ImportError:
     pass
 
-bpy.ops.object.mode_set(mode='OBJECT')
+
 
 # 获取名为“x”的物体
 obj = bpy.data.objects.get("Cube")
@@ -30,15 +30,17 @@ if not mesh.materials:
     mesh.materials.append(material)
 
 # 遍历每个面片
-polygons_Parameterization={}
-poly_idx=0
+
 total_face_Set=set() 
 for face in mesh.polygons:
     # 生成随机颜色
     current_face_Set=set()
     current_edge_Set=set()
     normal=face.normal
-    if not face_select_by_normal(normal) or face.index in total_face_Set:
+    print(normal)
+    if not face_select_by_normal(normal) :
+        continue
+    if face.index in total_face_Set:
         continue
     current_face_Set.add(face.index)
     total_face_Set.add(face.index)
@@ -66,4 +68,5 @@ for face in mesh.polygons:
     mesh.materials.append(material)
     for c_face in current_face_Set:
         mesh.polygons[c_face].material_index = len(mesh.materials) - 1
-    
+        
+print(total_face_Set)
