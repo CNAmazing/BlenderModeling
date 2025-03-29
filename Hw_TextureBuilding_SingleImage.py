@@ -88,18 +88,7 @@ def is_point_on_plane(point, plane_coeffs):
     
     # 判断 Ax + By + Cz + D 是否等于 0
     return abs(A * x + B * y + C * z + D )<=0.0001
-def are_vectors_orthogonal(vec1, vec2):
-    """
-    判断两个向量是否正交
-    :param vec1: 第一个向量 (x1, y1, z1)
-    :param vec2: 第二个向量 (x2, y2, z2)
-    :return: 如果两个向量正交，返回 True，否则返回 False
-    """
-    # 计算两个向量的点积
-    dot_product = np.dot(vec1, vec2)
 
-    # 如果点积为 0，说明两个向量正交
-    return dot_product == 0
 def create_material(color_dict):
     """
     创建一个新材质并将其添加到物体
@@ -542,7 +531,7 @@ def main():
                 vertices = np.array([np.array(loop.vert.co) for loop in face.loops])
                 if all(is_point_on_plane(vertex, c_plane_equation) for vertex in vertices):
                     ajust_UV(bm_uv_layer,face,polygonPlane)
-          
+            
 
     bpy.ops.object.mode_set(mode='OBJECT')
     material=bpy.data.materials.new("glassMaterial")  
@@ -564,7 +553,7 @@ def main():
     principled_bsdf.inputs['Metallic'].default_value = 0.5 # 设置金属度，0.0为非金属，1.0为金属 
     principled_bsdf.inputs['Roughness'].default_value = 0.0  # 设置粗糙度，0.0为光滑，1.0为粗糙
     # 将材质应用到选中的物体
-    obj.data.materials.append(material)   
+    obj.data.materials.append(material)
     for face_index in glass_poly_idxs:
         add_material_by_faceIdx(obj,face_index,"glassMaterial")    
 

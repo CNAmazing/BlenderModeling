@@ -32,46 +32,58 @@ import bpy
 
 # # 返回对象模式
 # bpy.ops.object.mode_set(mode='OBJECT')
+# import sys
+
+# # 获取 Blender 自带的 Python 解释器路径
+# blender_python_path = getattr(bpy.app, "binary_path_python", None)
+# if blender_python_path:
+#     print("Blender's Python Path:", blender_python_path)
+# else:
+#     print("Blender's Python Path not found.")
+
+# # 获取当前 Python 解释器路径
+# current_python_path = sys.executable
+# print("Current Python Path:", current_python_path)
+
+# # 获取 Blender 可执行文件路径
+# blender_path = bpy.app.binary_path
+# print("Blender Executable Path:", blender_path)
+# import matplotlib.pyplot as plt
+# import numpy as np
+
+# # 创建一个图形和子图
+# fig, ax = plt.subplots()
+
+# # 定义圆的参数
+# radius = 1  # 半径
+# center = (0, 0)  # 圆心坐标
+
+# # 生成圆的点
+# theta = np.linspace(0, 2 * np.pi, 100)  # 角度从 0 到 2π
+# x = center[0] + radius * np.cos(theta)  # x 坐标
+# y = center[1] + radius * np.sin(theta)  # y 坐标
+
+# # 绘制圆形
+# ax.plot(x, y, label="Circle")
+
+# # 设置图形属性
+# ax.set_aspect('equal')  # 设置 x 和 y 轴比例相同
+# ax.grid(True)  # 显示网格
+# ax.axhline(0, color='black', linewidth=0.5)  # 绘制 x 轴
+# ax.axvline(0, color='black', linewidth=0.5)  # 绘制 y 轴
+# ax.legend()  # 显示图例
+
+# # 显示图形
+# plt.savefig("output.png")
+
+
+import os
 import sys
+print("当前工作目录:", cwd)
+# script_path = os.path.abspath(__file__)
+cwd = os.getcwd()
+sys.path.append(cwd)
 
-# 获取 Blender 自带的 Python 解释器路径
-blender_python_path = getattr(bpy.app, "binary_path_python", None)
-if blender_python_path:
-    print("Blender's Python Path:", blender_python_path)
-else:
-    print("Blender's Python Path not found.")
-
-# 获取当前 Python 解释器路径
-current_python_path = sys.executable
-print("Current Python Path:", current_python_path)
-
-# 获取 Blender 可执行文件路径
-blender_path = bpy.app.binary_path
-print("Blender Executable Path:", blender_path)
-import matplotlib.pyplot as plt
-import numpy as np
-
-# 创建一个图形和子图
-fig, ax = plt.subplots()
-
-# 定义圆的参数
-radius = 1  # 半径
-center = (0, 0)  # 圆心坐标
-
-# 生成圆的点
-theta = np.linspace(0, 2 * np.pi, 100)  # 角度从 0 到 2π
-x = center[0] + radius * np.cos(theta)  # x 坐标
-y = center[1] + radius * np.sin(theta)  # y 坐标
-
-# 绘制圆形
-ax.plot(x, y, label="Circle")
-
-# 设置图形属性
-ax.set_aspect('equal')  # 设置 x 和 y 轴比例相同
-ax.grid(True)  # 显示网格
-ax.axhline(0, color='black', linewidth=0.5)  # 绘制 x 轴
-ax.axvline(0, color='black', linewidth=0.5)  # 绘制 y 轴
-ax.legend()  # 显示图例
-
-# 显示图形
-plt.savefig("output.png")
+print("当前Python模块搜索路径 (sys.path):")
+for path in sys.path:
+    print(path)

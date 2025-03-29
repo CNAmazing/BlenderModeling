@@ -1,16 +1,16 @@
-import bpy
-import random
-import math
-import cv2
-import numpy as np  
-import json
-import os
-from BlenderScripts import *
 
-try:
-    from Hw_Tools import *
-except ImportError:
-    pass
+#获取当前工作目录 并添加至sys.path
+import sys
+import os
+import bpy
+import numpy as np
+import cv2
+import json
+cwd = os.getcwd()
+sys.path.append(cwd)
+from Hw_Tools import *
+
+  
 def ensure_directory_exists(path):
     if not os.path.exists(path):
         os.makedirs(path)
@@ -151,7 +151,6 @@ def point_To_pixelUV(point,origin,actual_Width,actual_Height,poly_Width,poly_Hei
     x_pixel = (x - origin[0]) / actual_Width* poly_Width
     y_pixel = (y - origin[1]) / actual_Height* poly_Height
     return x_pixel,y_pixel
-  
 def generate_FacadeTexture(mesh,texture_image,poly_Information):
 
     width, height = texture_image.size
@@ -215,11 +214,10 @@ def generate_FacadeTexture(mesh,texture_image,poly_Information):
         poly_points: 多边形坐标点
         """
         FacadeTexture=areaA_to_areaB_AffineTransform_By_points(uv_points, poly_points,  texture_pixels_bgr,FacadeTexture)
-    return FacadeTexture    
-
+    return FacadeTexture 
 def main():
     output_path = "output"
-    obj_name = "Cube.001"
+    obj_name = "Cube"
     # 确保在对象模式下
     bpy.ops.object.mode_set(mode='OBJECT')
     # 获取名为“x”的物体
@@ -315,10 +313,8 @@ def main():
             poly_Height=640
             poly_Width=int(poly_Height*actual_width/actual_height)
         
-        origin=tuple([x_min,y_min])
-        print("origin:",origin)
         polygons_Parameterization[f'poly{str(poly_idx)}']={
-            "origin":origin,
+            "origin":tuple([x_min,y_min]),
             "center":tuple(face.center),
             'poly_ActualSize':(actual_width,actual_height),
             'poly_ImageSize':(poly_Width,poly_Height),
