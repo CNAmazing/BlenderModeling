@@ -187,7 +187,7 @@ def create_material(color_dict):
             material = bpy.data.materials.new(name=material_name)
             
             material.diffuse_color = (R, G, B, 1)
-def add_material_to_object(obj:bpy.types.Object,color_dict):       
+def add_material_to_object(obj,color_dict):       
     for key,value in color_dict.items():
         material_name=key
         material = bpy.data.materials.get(material_name)
@@ -236,7 +236,7 @@ def get_locations(xywh,R,T):
     #正常情况R*p  p为单个点 现在p在左边所以需要转置
     R=np.linalg.inv(R)
     return  np.dot(points_3d, R) + T
-def add_material_by_faceIdx(obj: bpy.types.Object ,faceIdx,material_name):
+def add_material_by_faceIdx(obj ,faceIdx,material_name):
     """
     为物体的指定面添加材质
     :param object: 物体
