@@ -57,7 +57,7 @@ class YOLO11:
  
         # 将图像的通道维度移到第一维
         image_data = np.transpose(image_data, (2, 0, 1))  # 通道优先
- 
+
         # 扩展图像数据的维度，以匹配模型输入的形状
         image_data = np.expand_dims(image_data, axis=0).astype(np.float32)
  
