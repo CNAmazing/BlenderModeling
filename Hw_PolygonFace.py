@@ -6,10 +6,33 @@ import bpy
 import numpy as np
 import cv2
 import json
+from itertools import combinations
 cwd = os.getcwd()
 sys.path.append(cwd)
 from Hw_Tools import *
-
+def line_plane_intersection(P0, v, Q0, n):
+    """
+    计算直线与平面的交点
+    :param P0: 直线上一点 [x, y, z]
+    :param v: 直线方向向量 [dx, dy, dz]
+    :param Q0: 平面上一点 [x, y, z]
+    :param n: 平面法向量 [a, b, c]
+    :return: 交点坐标，或返回是否平行/包含
+    """
+    P0, v, Q0, n = np.array(P0), np.array(v), np.array(Q0), np.array(n)
+    
+    denominator = np.dot(n, v)
+    numerator = np.dot(n, Q0 - P0)
+    
+    if np.abs(denominator) < 1e-6:  # 直线与平面平行
+        if np.abs(numerator) < 1e-6:
+            return "直线在平面内（无限多交点）"
+        else:
+            return "直线与平面平行（无交点）"
+    else:
+        t = numerator / denominator
+        intersection = P0 + t * v
+        return intersection
   
 def ensure_directory_exists(path):
     if not os.path.exists(path):
@@ -217,7 +240,7 @@ def generate_FacadeTexture(mesh,texture_image,poly_Information):
     return FacadeTexture 
 def main():
     output_path = "output"
-    obj_name = "Cube"
+    obj_name = "Cube.001"
     # 确保在对象模式下
     bpy.ops.object.mode_set(mode='OBJECT')
     # 获取名为“x”的物体
@@ -241,13 +264,17 @@ def main():
         
         current_face_Set=set()
         current_edge_Set=set()
+        current_vertex_Set=set()
         normal=face.normal
+        center=None
         if not face_select_by_normal(normal) or face.index in total_face_Set:
             continue
         current_face_Set.add(face.index)
         total_face_Set.add(face.index)
         for edge in face.edge_keys:
             current_edge_Set.add(edge)
+            current_vertex_Set.add(edge[0])
+            current_vertex_Set.add(edge[1])
         last_len=len(current_face_Set)
         current_len=0
         """
@@ -264,7 +291,8 @@ def main():
                         total_face_Set.add(f.index)
                         for e in f.edge_keys:
                             current_edge_Set.add(e)
-                        
+                            current_vertex_Set.add(e[0])
+                            current_vertex_Set.add(e[1])
             current_len=len(current_face_Set)
         
         
@@ -279,30 +307,85 @@ def main():
         x_max=float("-inf")
         y_min=float("inf")
         y_max=float("-inf")
-        for c_face in current_face_Set:
-            polygon = mesh.polygons[c_face]
-            vertices = np.array([np.array(mesh.vertices[idx].co) for idx in polygon.vertices])
-            print("vertices:",vertices)
-            vertices_projected = project_points_to_plane(vertices, z_axis, face.center)
-            for vertex in vertices_projected:
-                x,y,z=vertex
-                u = np.dot([x,y,z], x_axis)
-                v = np.dot([x,y,z], y_axis)
-                x_min = min(x_min, u)
-                x_max = max(x_max, u)
-                y_min = min(y_min, v)
-                y_max = max(y_max, v)
-            # for vertex_idx in polygon.vertices:
-            #     x,y,z=mesh.vertices[vertex_idx].co
-            #     point=np.array([x,y,z])
-            #     center=face.center
-            #     u = np.dot([x,y,z], x_axis)
-            #     v = np.dot([x,y,z], y_axis)
-            #     x_min = min(x_min, u)
-            #     x_max = max(x_max, u)
-            #     y_min = min(y_min, v)
-            #     y_max = max(y_max, v)
-            
+        # center_group=np.array([np.array(mesh.vertices[v_idx].co) for v_idx in current_vertex_Set])
+        # center=np.mean(center_group,axis=0)
+        
+        poly_vertices = np.array([np.array(mesh.vertices[v_idx].co) for v_idx in current_vertex_Set]) 
+        print("vertices:",poly_vertices)
+        # vertices_projected = project_points_to_plane(vertices, z_axis, center)
+        u=np.dot(poly_vertices, x_axis)
+        v=np.dot(poly_vertices, y_axis)
+        x_min=min(x_min, np.min(u))
+        x_max=max(x_max, np.max(u))
+        y_min=min(y_min, np.min(v))
+        y_max=max(y_max, np.max(v))
+
+        x_min_idx = np.argmin(u)
+        x_max_idx = np.argmax(u)
+        y_min_idx = np.argmin(v)
+        y_max_idx = np.argmax(v)
+        x_min_point = poly_vertices[x_min_idx]
+        x_max_point = poly_vertices[x_max_idx]
+        y_min_point = poly_vertices[y_min_idx]
+        y_max_point = poly_vertices[y_max_idx]
+        r1=line_plane_intersection(P0=y_min_point,
+                                    v=x_axis,
+                                    Q0=x_min_point,
+                                    n=x_axis)
+        r2=line_plane_intersection(P0=y_max_point,
+                                    v=x_axis,
+                                    Q0=x_max_point,
+                                    n=x_axis)
+        r3=line_plane_intersection(P0=x_min_point,
+                                    v=y_axis,
+                                    Q0=y_min_point,
+                                    n=y_axis)
+        r4=line_plane_intersection(P0=x_max_point,
+                                    v=y_axis,
+                                    Q0=y_max_point,
+                                    n=y_axis)           
+        center=(r1+r2+r3+r4)/4
+        # for c_face in current_face_Set:
+        #     polygon = mesh.polygons[c_face]
+
+        #     vertices = np.array([np.array(mesh.vertices[idx].co) for idx in polygon.vertices])
+           
+        #     print("vertices:",vertices)
+        #     # vertices_projected = project_points_to_plane(vertices, z_axis, center)
+        #     u=np.dot(vertices, x_axis)
+        #     v=np.dot(vertices, y_axis)
+        #     x_min=min(x_min, np.min(u))
+        #     x_max=max(x_max, np.max(u))
+        #     y_min=min(y_min, np.min(v))
+        #     y_max=max(y_max, np.max(v))
+
+        #     x_min_idx = np.argmin(u)
+        #     x_max_idx = np.argmax(u)
+        #     y_min_idx = np.argmin(v)
+        #     y_max_idx = np.argmax(v)
+        #     x_min_point = vertices[x_min_idx]
+        #     x_max_point = vertices[x_max_idx]
+        #     y_min_point = vertices[y_min_idx]
+        #     y_max_point = vertices[y_max_idx]
+        #     r1=line_plane_intersection(P0=y_min_point,
+        #                                v=x_axis,
+        #                                Q0=x_min_point,
+        #                                n=x_axis)
+        #     r2=line_plane_intersection(P0=y_max_point,
+        #                                v=x_axis,
+        #                                Q0=x_max_point,
+        #                                n=x_axis)
+        #     r3=line_plane_intersection(P0=x_min_point,
+        #                                v=y_axis,
+        #                                Q0=y_min_point,
+        #                                n=y_axis)
+        #     r4=line_plane_intersection(P0=x_max_point,
+        #                                v=y_axis,
+        #                                Q0=y_max_point,
+        #                                n=y_axis)           
+        #     center=(r1+r2+r3+r4)/4
+         
+    
         actual_width = x_max - x_min
         actual_height = y_max - y_min
         
@@ -315,14 +398,13 @@ def main():
         
         polygons_Parameterization[f'poly{str(poly_idx)}']={
             "origin":tuple([x_min,y_min]),
-            "center":tuple(face.center),
+            "center":tuple(center),
             'poly_ActualSize':(actual_width,actual_height),
             'poly_ImageSize':(poly_Width,poly_Height),
             'basis':tuple([list(x_axis),list(y_axis),list(z_axis)]),
             "faces_idx":tuple(current_face_Set),
             "edges_idx":tuple(current_edge_Set)
         }
-
         poly_idx+=1
         
 
@@ -338,7 +420,7 @@ def main():
             cv2.imwrite(polyImageName, FacadeTexture)
     json_path=os.path.join(output_path,obj_name,"data.json")
     with open(json_path, "w") as json_file:
-            json.dump(polygons_Parameterization, json_file, indent=4)
+        json.dump(polygons_Parameterization, json_file, indent=4)
 
 
 

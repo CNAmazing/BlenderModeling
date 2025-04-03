@@ -64,6 +64,7 @@ class PolygonPlane():
         self.R=None
         self.actual_width=None
         self.actual_height=None
+        self.classes=None
     @property
     def facade_plane_equation(self):
         return self.plane_equation(self.normal, self.original_point)
@@ -107,6 +108,15 @@ class PolygonPlane():
         D = -(A * x0 + B * y0 + C * z0)
         
         return A, B, C, D   
+def compute_centroid(points):
+    """
+    计算三维点集的质心坐标
+    :param points: 输入点集，形状为 (N, 3) 的 NumPy 数组或列表
+    :return: 质心坐标 [Cx, Cy, Cz]
+    """
+    points = np.array(points)  # 确保转换为 NumPy 数组
+    centroid = np.mean(points, axis=0)  # 沿第0轴（行方向）求均值
+    return centroid  # 返回列表（可选）
 def generate_cube_by_currentClasses(current_classes,facade_parameterization,poly_index,R,T,image_width,image_height,actual_width,actual_height,euler):
     Redundancy=0.2
     for c in current_classes:
@@ -143,7 +153,7 @@ def generate_cube_by_currentClasses_PolyInfo(current_classes,polyInfo,euler):
     R=np.array(polyInfo['basis']).T
     T=np.array(polyInfo['center'])
     for c in current_classes:
-        c_xywh=polyInfo[c].copy()
+        c_xywh=np.array(polyInfo[c])
         c_xywh[:,1]=image_height-c_xywh[:,3]-c_xywh[:,1]
         c_xywh=c_xywh-np.array([image_width/2,image_height/2,0,0])
         c_xywh=c_xywh/np.array([image_width,image_height,image_width,image_height])

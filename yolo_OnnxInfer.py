@@ -96,8 +96,9 @@ class YOLO11:
         top, bottom = int(round(dh)), int(round(dh))
         left, right = int(round(dw)), int(round(dw))
         img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
+        if img.shape[0] != new_shape[0] or img.shape[1] != new_shape[1]:
+            img = cv2.resize(img, new_shape, interpolation=cv2.INTER_LINEAR)
         print(f"Final letterboxed image shape: {img.shape}")
- 
         return img, (r, r), (dw, dh)
  
  
@@ -179,7 +180,7 @@ class YOLO11:
         color = self.color_palette[class_id]
  
         # 在图像上绘制边界框
-        cv2.rectangle(img, (int(x1), int(y1)), (int(x1 + w), int(y1 + h)), color, 2)
+        cv2.rectangle(img, (int(x1), int(y1)),(int(x1 + w),int(y1 + h)), color, 1)
  
         # 创建包含类别名和分数的标签文本
         label = f"{self.classes[class_id]}: {score:.2f}"
@@ -231,8 +232,8 @@ if __name__ == "__main__":
  
     # 使用指定的参数创建 YOLO11 类的实例
     detection = YOLO11(
-                    onnx_model='runs/train/v11+Adam+epochs300+imgsz6402/weights/best.onnx',
-                    input_image='datasets/YOLODataset/images/train/00050.jpg',
+                    onnx_model='checkpoint\YOLO_window.onnx',
+                    input_image='output\Cube.001\images\poly1.jpg',
                     confidence_thres=0.5,
                     iou_thres=0.25)    
     # 执行目标检测并获取输出图像
@@ -244,7 +245,7 @@ if __name__ == "__main__":
     'class_ids': 检测到的目标类别 ID 列表
     """
     # 保存输出图像到文件
-    # cv2.imwrite("det_result_picture.jpg", output_image)
+    cv2.imwrite("det_result_picture.jpg", output_image)
  
     # print("图像已保存为 det_result_picture.jpg")
  

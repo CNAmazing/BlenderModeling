@@ -39,6 +39,12 @@ def main():
     """
     polygonPlaneList=[]
     count_classes=[]
+    name = os.path.basename(folder_path)
+    obj = bpy.context.scene.objects.get(name)  
+    if obj.type != 'MESH':
+        raise ValueError(f"{obj.name} 不是网格对象")
+    
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     for poly_idx,poly_info in data.items():
         print(f"poly_idx:{poly_idx}")
         print(f"poly_info:{poly_info}")
@@ -46,8 +52,8 @@ def main():
         normalImage_path=os.path.join(folder_path,'images',poly_idx+'_normal.jpg')
         depthImage_path=os.path.join(folder_path,'images',poly_idx+'_depth.jpg')
         current_classes=[cls for cls in total_classes if cls in poly_info]
-        for cls in current_classes:
-            poly_info[cls]=xyxy_to_xywh(poly_info[cls])
+        # for cls in current_classes:
+        #     poly_info[cls]=xyxy_to_xywh(poly_info[cls])
 
             
         #blender读取图片顺序是从左下角开始，而numpy读取图片是从左上角开始
@@ -67,40 +73,34 @@ def main():
                     depth_Dict[key]=depth_Dict[key] & ~depth_Dict['window'] & ~depth_Dict['door']
                 case 'window':
                     depth_Dict[key]=depth_Dict[key] & ~depth_Dict['glass'] 
+
+        poly_info['facadeDepth']=np.mean(depthImage[depth_Dict['facade']])
+        threshold=100
+        for cls in current_classes:
+            poly_info[f'{cls}Depth']=np.mean(depthImage[depth_Dict[cls]])-poly_info['facadeDepth']
+            poly_info[f'{cls}Depth']=poly_info[f'{cls}Depth']/threshold
+        if 'glass' in current_classes:
+            poly_info['glassDepth']=poly_info['glassDepth']-poly_info['windowDepth']
         
-        
-        for key in depth_Dict:
-            poly_info[f'{key}Depth']=np.mean(depthImage[depth_Dict[key]])
-        
-    
         """
         主程序阶段
         """
-        name = os.path.basename(folder_path)
-        obj = bpy.context.scene.objects.get('Cube')  
-        if obj.type != 'MESH':
-            raise ValueError(f"{obj.name} 不是网格对象")
-        
-        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-        
-
-        
         for c in current_classes:
             if c not in count_classes:
                 count_classes.append(c)
         R=np.array(poly_info['basis'])
         R=R.T
-        T=poly_info['center']
+        T=np.array(poly_info['center'])
         R_before=np.array([[1, 0, 0],
                            [0, 1, 0],
                            [0, 0, 1]])
-        R_after=poly_info['basis']
+        R_after=np.array(poly_info['basis'])
         rotation_matrix = np.dot(R_before, np.linalg.inv(R_after))
         euler = mathutils.Matrix(rotation_matrix).to_euler('XYZ')
-        vertices = np.array([np.array(obj.data.vertices[idx].co) for idx in poly.vertices])
+        # vertices = np.array([np.array(obj.data.vertices[idx].co) for idx in poly.vertices])
         actual_width = poly_info['poly_ActualSize'][0]
-        actual_height = poly_info['poly_ActualSize'][1]
-        polygonPlane = PolygonPlane(poly_info['basis'][2], poly_info['center'])
+        actual_height= poly_info['poly_ActualSize'][1]
+        polygonPlane = PolygonPlane(np.array(poly_info['basis'][2]), np.array(poly_info['center']))
         for cls in current_classes:
             setattr(polygonPlane,f"{cls}_depth",poly_info[f"{cls}Depth"])
                 
@@ -108,14 +108,15 @@ def main():
         polygonPlane.R=R
         polygonPlane.actual_width=actual_width
         polygonPlane.actual_height=actual_height
+        polygonPlane.classes=current_classes
         polygonPlaneList.append(polygonPlane)
         generate_cube_by_currentClasses_PolyInfo(current_classes,
                                         poly_info,
                                         euler)
     
     for cls in count_classes:
-            c_collection = bpy.data.collections[f"{cls}Collection"]
-            apply_boolean(obj,c_collection)
+        c_collection = bpy.data.collections[f"{cls}Collection"]
+        apply_boolean(obj,c_collection)
     
 
         
@@ -133,68 +134,68 @@ def main():
             # if all(is_point_on_plane(point, polygonPlane.facade_plane_equation) for point in vertices):
             #     facade_poly_idxs.append(poly.index)
 
-            for cls in count_classes:
+            for cls in polygonPlane.classes:
                 c_plane_equation=getattr(polygonPlane,f"{cls}_plane_equation")
                 c_poly_idxs=locals()[f"{cls}_poly_idxs"]
                 if all(is_point_on_plane(point, c_plane_equation) for point in vertices):
                     c_poly_idxs.append(poly.index)
             
 
-    """
-    调整UV
-    """
-    bpy.ops.object.mode_set(mode='EDIT')
+    # """
+    # 调整UV
+    # """
+    # bpy.ops.object.mode_set(mode='EDIT')
 
-    bpy.ops.mesh.select_all(action='DESELECT')
-    bpy.ops.mesh.select_mode(type="FACE")
-    bpy.ops.object.mode_set(mode='OBJECT')
-    # uv_layer = obj.data.uv_layers.new(name="Custom_UV_Layer")
-    # obj.data.uv_layers.active = uv_layer
-    for face_index in window_poly_idxs:
-        obj.data.polygons[face_index].select = True
-    for face_index in glass_poly_idxs:
-        obj.data.polygons[face_index].select = True
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.uv.unwrap(method='CONFORMAL')
-    bpy.ops.uv.smart_project()
-    uv_layer_name = "UVMap"  # 替换为你的UV层名字
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.mesh.select_all(action='DESELECT')
-    bm = bmesh.from_edit_mesh(obj.data)
-    bm_uv_layer = bm.loops.layers.uv["UVMap"]
-    for polygonPlane in polygonPlaneList:
-        for cls in count_classes:
-            c_poly_idxs=locals()[f"{cls}_poly_idxs"]
-            c_plane_equation=getattr(polygonPlane,f"{cls}_plane_equation")
-            for face_index in c_poly_idxs:
-                face = bm.faces[face_index]
-                vertices = np.array([np.array(loop.vert.co) for loop in face.loops])
-                if all(is_point_on_plane(vertex, c_plane_equation) for vertex in vertices):
-                    ajust_UV(bm_uv_layer,face,polygonPlane)
+    # bpy.ops.mesh.select_all(action='DESELECT')
+    # bpy.ops.mesh.select_mode(type="FACE")
+    # bpy.ops.object.mode_set(mode='OBJECT')
+    # # uv_layer = obj.data.uv_layers.new(name="Custom_UV_Layer")
+    # # obj.data.uv_layers.active = uv_layer
+    # for face_index in window_poly_idxs:
+    #     obj.data.polygons[face_index].select = True
+    # for face_index in glass_poly_idxs:
+    #     obj.data.polygons[face_index].select = True
+    # bpy.ops.object.mode_set(mode='EDIT')
+    # bpy.ops.uv.unwrap(method='CONFORMAL')
+    # bpy.ops.uv.smart_project()
+    # uv_layer_name = "UVMap"  # 替换为你的UV层名字
+    # bpy.ops.object.mode_set(mode='EDIT')
+    # bpy.ops.mesh.select_all(action='DESELECT')
+    # bm = bmesh.from_edit_mesh(obj.data)
+    # bm_uv_layer = bm.loops.layers.uv["UVMap"]
+    # for polygonPlane in polygonPlaneList:
+    #     for cls in polygonPlane.classes:
+    #         c_poly_idxs=locals()[f"{cls}_poly_idxs"]
+    #         c_plane_equation=getattr(polygonPlane,f"{cls}_plane_equation")
+    #         for face_index in c_poly_idxs:
+    #             face = bm.faces[face_index]
+    #             vertices = np.array([np.array(loop.vert.co) for loop in face.loops])
+    #             if all(is_point_on_plane(vertex, c_plane_equation) for vertex in vertices):
+    #                 ajust_UV(bm_uv_layer,face,polygonPlane)
             
-
-    bpy.ops.object.mode_set(mode='OBJECT')
-    material=bpy.data.materials.new("glassMaterial")  
-    material.use_nodes = True
-    # 获取材质的节点树
-    nodes = material.node_tree.nodes
-    # 创建图像纹理节点
-    image_texture = nodes.new(type='ShaderNodeTexImage')
-    # 加载图像
-    image_texture.image = image
-    # 获取纹理坐标节点
-    texture_coord = nodes.new(type='ShaderNodeTexCoord')
-    # 获取Principled BSDF节点
-    principled_bsdf = nodes.get("原理化 BSDF")
-    # 连接纹理坐标到图像纹理节点
-    material.node_tree.links.new(texture_coord.outputs['UV'], image_texture.inputs['Vector'])
-    # 连接图像纹理到 Principled BSDF 的 Base Color
-    material.node_tree.links.new(image_texture.outputs['Color'], principled_bsdf.inputs['Base Color'])    
-    principled_bsdf.inputs['Metallic'].default_value = 0.5 # 设置金属度，0.0为非金属，1.0为金属 
-    principled_bsdf.inputs['Roughness'].default_value = 0.0  # 设置粗糙度，0.0为光滑，1.0为粗糙
-    # 将材质应用到选中的物体
-    obj.data.materials.append(material)
-    for face_index in glass_poly_idxs:
-        add_material_by_faceIdx(obj,face_index,"glassMaterial")    
+    # image_blender=bpy.data.images.load(image_path)
+    # bpy.ops.object.mode_set(mode='OBJECT')
+    # material=bpy.data.materials.new("glassMaterial")  
+    # material.use_nodes = True
+    # # 获取材质的节点树
+    # nodes = material.node_tree.nodes
+    # # 创建图像纹理节点
+    # image_texture = nodes.new(type='ShaderNodeTexImage')
+    # # 加载图像
+    # image_texture.image = image
+    # # 获取纹理坐标节点
+    # texture_coord = nodes.new(type='ShaderNodeTexCoord')
+    # # 获取Principled BSDF节点
+    # principled_bsdf = nodes.get("原理化 BSDF")
+    # # 连接纹理坐标到图像纹理节点
+    # material.node_tree.links.new(texture_coord.outputs['UV'], image_texture.inputs['Vector'])
+    # # 连接图像纹理到 Principled BSDF 的 Base Color
+    # material.node_tree.links.new(image_texture.outputs['Color'], principled_bsdf.inputs['Base Color'])    
+    # principled_bsdf.inputs['Metallic'].default_value = 0.5 # 设置金属度，0.0为非金属，1.0为金属 
+    # principled_bsdf.inputs['Roughness'].default_value = 0.0  # 设置粗糙度，0.0为光滑，1.0为粗糙
+    # # 将材质应用到选中的物体
+    # obj.data.materials.append(material)
+    # for face_index in glass_poly_idxs:
+    #     add_material_by_faceIdx(obj,face_index,"glassMaterial")    
 
 main()
