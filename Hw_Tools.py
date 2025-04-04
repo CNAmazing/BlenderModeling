@@ -2,6 +2,7 @@ import math
 import numpy as np
 import bpy
 import json
+import os
 def xyxy_to_xywh(bboxes):
     array=[]
     for bbox in bboxes:
@@ -87,6 +88,7 @@ class PolygonPlane():
         
         """
         R已经转置 每一列是一个基向量
+        将三维点转换为UV坐标
         """
         p0=np.dot(point-self.original_point,self.R)
         p0[0]+=self.actual_width/2
@@ -179,6 +181,12 @@ def generate_cube_by_currentClasses_PolyInfo(current_classes,polyInfo,euler):
                         rotation=euler,
                         scale=(w,h,c_depth+Redundancy),
                         colletion=c_collection)
+def get_basename_without_suffix(filepath):
+    path = filepath
+    filename = os.path.basename(path)  # 获取文件名 '00472.jpg'
+    basename = filename.split('.')[0]
+    return basename  # 返回文件名（不带扩展名）
+
 def create_material(color_dict):
     """
     创建一个新材质并将其添加到物体

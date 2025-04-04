@@ -2,6 +2,12 @@ import bpy
 import cv2
 import numpy as np
 import math
+import sys
+import os
+cwd = os.getcwd()
+sys.path.append(cwd)
+from Hw_Tools import *
+
 def add_material_by_faceIdx(obj,faceIdx,material_name):
     """
     为物体的指定面添加材质
@@ -53,23 +59,24 @@ def main():
 
     # 创建一个正方体
     bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0, 0))
-    image_path=r"E:\Desktop\facadeTest_ControlNet\1 (6).png"
+    image_path=r"E:\Desktop\facade\00472.jpg"
+    basename=get_basename_without_suffix(image_path)
     image=cv2.imread(image_path)
     height,width,channal=image.shape
 
     # 获取当前选中的对象（即刚刚创建的正方体）
     cube = bpy.context.object
-    cube.name = "Cube"
+    cube.name = basename
     # 设置 XYZ 缩放
     cube.scale = (width/2/10, width/2/10, height/2/10)  # 设置 X, Y, Z 缩放比例
 
     # 应用缩放变换
     bpy.ops.object.transform_apply(scale=True)
 
-    obj = bpy.data.objects.get("Cube")
+    obj = bpy.data.objects.get(basename)
     mesh = obj.data
     UV_Coordinates=(1,0),(1,1),(0,1),(0,0)
-    uv_layer_name = "MyUVMap"
+    uv_layer_name = "UVMap"
     image_bl=bpy.data.images.load(image_path) 
 
     if "white" not in bpy.data.materials:
@@ -122,7 +129,7 @@ def main():
                 uv.y = UV_s[1]  # V 坐标
 
         add_material_by_faceIdx(obj,poly.index,"MyMaterial")
-    mesh.uv_layers['MyUVMap'].active_render = True
+    mesh.uv_layers['UVMap'].active_render = True
         # for loop_index in poly.loop_indices:
         #         vertex_index = mesh.loops[loop_index].vertex_index
         #         vertex_co = obj.data.vertices[vertex_index].co

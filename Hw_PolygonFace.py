@@ -240,7 +240,7 @@ def generate_FacadeTexture(mesh,texture_image,poly_Information):
     return FacadeTexture 
 def main():
     output_path = "output"
-    obj_name = "Cube.001"
+    obj_name = "00472"
     # 确保在对象模式下
     bpy.ops.object.mode_set(mode='OBJECT')
     # 获取名为“x”的物体
