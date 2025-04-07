@@ -74,6 +74,9 @@ def Metric3d_Processing(onnx_model=None, input_image=None):
 
     ## Real Test
     rgb_image = cv2.imread(input_image)[:, :, ::-1]  # BGR to RGB
+    black_pixels = np.all(rgb_image == [0, 0, 0], axis=-1)
+    rgb_image[black_pixels] = [123.675, 116.28, 103.53]  # Replace black pixels with padding value
+
     original_shape = rgb_image.shape[:2]
     onnx_input, pad_info = prepare_input(rgb_image, input_size)
     outputs = ort_session.run(None, onnx_input)
@@ -84,6 +87,7 @@ def Metric3d_Processing(onnx_model=None, input_image=None):
         pad_info[0] : input_size[0] - pad_info[1],
         pad_info[2] : input_size[1] - pad_info[3],
     ]
+    
     normal=normal[
         :,
         pad_info[0] : input_size[0] - pad_info[1],
@@ -99,6 +103,10 @@ def Metric3d_Processing(onnx_model=None, input_image=None):
     depth = cv2.resize(
         depth, (original_shape[1], original_shape[0]), interpolation=cv2.INTER_NEAREST
     )
+    # depth[black_pixels]=0
+    # min_val = np.min(depth[~black_pixels])
+    # max_val = np.max(depth[~black_pixels])
+    # depth[~black_pixels] = 255 * ((depth[~black_pixels] - min_val)/(max_val-min_val))
 
     # plt.subplot(1, 3, 1)
     # plt.imshow(normal)
@@ -147,12 +155,14 @@ class YOLO11:
         """
         # 使用 OpenCV 读取输入图像
         self.img = cv2.imread(self.input_image)
+        black_pixels = np.all(self.img == [0, 0, 0], axis=-1)
+        self.img[black_pixels] = [114, 114, 114]  
         # 获取输入图像的高度和宽度
         self.img_height, self.img_width = self.img.shape[:2]
  
         # 将图像颜色空间从 BGR 转换为 RGB
         img = cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB)
- 
+
         # 保持宽高比，进行 letterbox 填充, 使用模型要求的输入尺寸
         img, self.ratio, (self.dw, self.dh) = self.letterbox(img, new_shape=(self.input_width, self.input_height))
  
@@ -439,7 +449,7 @@ CLASS_NAMES = {
 }
 TOTAL_CLASSES=['window','door','glass']
 def main():
-    input_folder = r"output\00472"
+    input_folder = r"output\001"
     jps_paths,basenames=get_jpg_paths(input_folder)
     json_path=os.path.join(input_folder,'data.json')
     poly_dict=read_json(json_path)
@@ -452,6 +462,7 @@ def main():
     for image_path,basename in zip(jps_paths, basenames):
         
         # 处理每个图片
+        
         Metric3d_Processing(onnx_model="checkpoint\Metric3d_vit_small.onnx",
                             input_image=image_path
             )

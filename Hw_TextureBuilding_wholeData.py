@@ -12,7 +12,7 @@ from Hw_Tools import *
       
 def main():
 
-    folder_path=r'E:\WorkSpace\BlenderModeling\output\00472'
+    folder_path=r'output\001'
     total_classes=['window','door','glass']
     json_path=os.path.join(folder_path,'data.json')
     data=read_json(json_path)
@@ -72,13 +72,13 @@ def main():
                     depth_Dict[key]=depth_Dict[key] & ~depth_Dict['glass'] 
 
         poly_info['facadeDepth']=np.mean(depthImage[depth_Dict['facade']])
-        threshold=1
+        threshold=10
         for cls in current_classes:
             poly_info[f'{cls}Depth']=np.mean(depthImage[depth_Dict[cls]])-poly_info['facadeDepth']
             poly_info[f'{cls}Depth']=poly_info[f'{cls}Depth']/threshold
         if 'glass' in current_classes:
             poly_info['glassDepth']=poly_info['glassDepth']-poly_info['windowDepth']
-        
+        print(f'poly_info:{poly_info}')
         """
         主程序阶段
         """
@@ -142,63 +142,63 @@ def main():
     调整UV
     """
     
-    uv_layer_name = "UVMap"  
-    mesh = obj.data
-    uv_layer = mesh.uv_layers[uv_layer_name]
-    mesh.uv_layers.active = uv_layer
+    # uv_layer_name = "UVMap"  
+    # mesh = obj.data
+    # uv_layer = mesh.uv_layers[uv_layer_name]
+    # mesh.uv_layers.active = uv_layer
 
-    for polygonPlane in polygonPlaneList:
-        for cls in polygonPlane.classes:
-            c_poly_idxs=locals()[f"{cls}_poly_idxs"]
-            c_plane_equation=getattr(polygonPlane,f"{cls}_plane_equation")
-            for face_index in c_poly_idxs:
-                face = mesh.polygons[face_index]
+    # for polygonPlane in polygonPlaneList:
+    #     for cls in polygonPlane.classes:
+    #         c_poly_idxs=locals()[f"{cls}_poly_idxs"]
+    #         c_plane_equation=getattr(polygonPlane,f"{cls}_plane_equation")
+    #         for face_index in c_poly_idxs:
+    #             face = mesh.polygons[face_index]
 
-                vertex_coords = np.array([np.array(mesh.vertices[vertex_idx].co) for vertex_idx in face.vertices])
-                if all(is_point_on_plane(vertex, c_plane_equation) for vertex in vertex_coords):
-                    for loop_index,vertex in zip(face.loop_indices,vertex_coords):
-                        # 获取 UV 坐标
-                        uv = uv_layer.data[loop_index].uv
-                        u,v=polygonPlane.point_to_UV(vertex)
-                        # 调整 UV 坐标（示例：简单映射）
-                        uv[0] = u  # U 坐标
-                        uv[1] = v
+    #             vertex_coords = np.array([np.array(mesh.vertices[vertex_idx].co) for vertex_idx in face.vertices])
+    #             if all(is_point_on_plane(vertex, c_plane_equation) for vertex in vertex_coords):
+    #                 for loop_index,vertex in zip(face.loop_indices,vertex_coords):
+    #                     # 获取 UV 坐标
+    #                     uv = uv_layer.data[loop_index].uv
+    #                     u,v=polygonPlane.point_to_UV(vertex)
+    #                     # 调整 UV 坐标（示例：简单映射）
+    #                     uv[0] = u  # U 坐标
+    #                     uv[1] = v
 
-                # vertices = np.array([np.array(loop.vert.co) for loop in face.loops])
-                    # ajust_UV(bm_uv_layer,face,polygonPlane)
-    bpy.ops.object.mode_set(mode='OBJECT')
+    #             # vertices = np.array([np.array(loop.vert.co) for loop in face.loops])
+    #                 # ajust_UV(bm_uv_layer,face,polygonPlane)
+    # bpy.ops.object.mode_set(mode='OBJECT')
     
-    #连接法线贴图 并修改粗糙度
-    base_texture=obj.material_slots[0].material
-    normal_texture = base_texture.node_tree.nodes.new(type='ShaderNodeTexImage')
-    normal_texture.image = bpy.data.images.load(normalImage_path)
-    normal_principled_bsdf = base_texture.node_tree.nodes.get("原理化 BSDF")
-    normal_principled_bsdf.inputs['Roughness'].default_value =1.0
-    base_texture.node_tree.links.new(normal_texture.outputs['Color'], normal_principled_bsdf.inputs['Normal'])
+    # #连接法线贴图 并修改粗糙度
+    # base_texture=obj.material_slots[0].material
+    # normal_texture = base_texture.node_tree.nodes.new(type='ShaderNodeTexImage')
+    # normal_texture.image = bpy.data.images.load(normalImage_path)
+    # normal_principled_bsdf = base_texture.node_tree.nodes.get("原理化 BSDF")
+    # normal_principled_bsdf.inputs['Roughness'].default_value =1.0
+    # base_texture.node_tree.links.new(normal_texture.outputs['Color'], normal_principled_bsdf.inputs['Normal'])
 
-    #创建玻璃材质 
-    image_blender=bpy.data.images.load(image_path)
-    material=bpy.data.materials.new("glassMaterial")  
-    material.use_nodes = True
-    # 获取材质的节点树
-    nodes = material.node_tree.nodes
-    # 创建图像纹理节点
-    image_texture = nodes.new(type='ShaderNodeTexImage')
-    # 加载图像
-    image_texture.image = image_blender
-    # 获取纹理坐标节点
-    texture_coord = nodes.new(type='ShaderNodeTexCoord')
-    # 获取Principled BSDF节点
-    principled_bsdf = nodes.get("原理化 BSDF")
-    # 连接纹理坐标到图像纹理节点
-    material.node_tree.links.new(texture_coord.outputs['UV'], image_texture.inputs['Vector'])
-    # 连接图像纹理到 Principled BSDF 的 Base Color
-    material.node_tree.links.new(image_texture.outputs['Color'], principled_bsdf.inputs['Base Color'])    
-    principled_bsdf.inputs['Metallic'].default_value = 0.0 # 设置金属度，0.0为非金属，1.0为金属 
-    principled_bsdf.inputs['Roughness'].default_value = 0.0  # 设置粗糙度，0.0为光滑，1.0为粗糙
-    # 将材质应用到选中的物体
-    obj.data.materials.append(material)
-    for face_index in glass_poly_idxs:
-        add_material_by_faceIdx(obj,face_index,"glassMaterial")    
+    # #创建玻璃材质 
+    # image_blender=bpy.data.images.load(image_path)
+    # material=bpy.data.materials.new("glassMaterial")  
+    # material.use_nodes = True
+    # # 获取材质的节点树
+    # nodes = material.node_tree.nodes
+    # # 创建图像纹理节点
+    # image_texture = nodes.new(type='ShaderNodeTexImage')
+    # # 加载图像
+    # image_texture.image = image_blender
+    # # 获取纹理坐标节点
+    # texture_coord = nodes.new(type='ShaderNodeTexCoord')
+    # # 获取Principled BSDF节点
+    # principled_bsdf = nodes.get("原理化 BSDF")
+    # # 连接纹理坐标到图像纹理节点
+    # material.node_tree.links.new(texture_coord.outputs['UV'], image_texture.inputs['Vector'])
+    # # 连接图像纹理到 Principled BSDF 的 Base Color
+    # material.node_tree.links.new(image_texture.outputs['Color'], principled_bsdf.inputs['Base Color'])    
+    # principled_bsdf.inputs['Metallic'].default_value = 0.0 # 设置金属度，0.0为非金属，1.0为金属 
+    # principled_bsdf.inputs['Roughness'].default_value = 0.0  # 设置粗糙度，0.0为光滑，1.0为粗糙
+    # # 将材质应用到选中的物体
+    # obj.data.materials.append(material)
+    # for face_index in glass_poly_idxs:
+    #     add_material_by_faceIdx(obj,face_index,"glassMaterial")    
 
 main()

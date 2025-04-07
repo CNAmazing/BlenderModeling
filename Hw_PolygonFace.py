@@ -204,7 +204,7 @@ def generate_FacadeTexture(mesh,texture_image,poly_Information):
             # 如果不存在，创建新的 UV 层并激活
         uv_layer = mesh.uv_layers.new(name=uv_layer_name)
         mesh.uv_layers.active = uv_layer
-    FacadeTexture=np.zeros((poly_Height, poly_Width,3), dtype=np.uint8)
+    FacadeTexture = np.zeros((poly_Height, poly_Width, 3), dtype=np.uint8)
     for face_idx in face_idxs:
         face = mesh.polygons[face_idx]
         vertex_coords = np.array([np.array(mesh.vertices[vertex_idx].co) for vertex_idx in face.vertices])
@@ -216,7 +216,7 @@ def generate_FacadeTexture(mesh,texture_image,poly_Information):
         
         # uvs = np.array([np.array(uv_layer.data[loop_index].uv) for loop_index in face.loop_indices])
         poly_points = []
-        print("vertex_coords:",vertex_coords)
+        # print("vertex_coords:",vertex_coords)
         # vertex_coords_projected = project_points_to_plane(vertex_coords, R[2], center)
         for point in vertex_coords:
             x_pixel,y_pixel = point_To_pixelUV( point=point, 
@@ -244,7 +244,7 @@ def generate_FacadeTexture(mesh,texture_image,poly_Information):
     return FacadeTexture 
 def main():
     output_path = "output"
-    obj_name = "00472"
+    obj_name = "001"
     # 确保在对象模式下
     bpy.ops.object.mode_set(mode='OBJECT')
     # 获取名为“x”的物体
@@ -378,12 +378,14 @@ def main():
             # save_texture_for_faces(mesh, value['faces_idx'], texture_image, f"{key}.png")
             FacadeTexture=generate_FacadeTexture(mesh,texture_image,value)
             print(f"当前将保存{key}")
+            
             polyImageName=os.path.join(output_path,obj_name,"images",f"{key}.jpg")
             cv2.imwrite(polyImageName, FacadeTexture)
+            
     json_path=os.path.join(output_path,obj_name,"data.json")
     with open(json_path, "w") as json_file:
         json.dump(polygons_Parameterization, json_file, indent=4)
-
+    print('Done!')
 
 
 
