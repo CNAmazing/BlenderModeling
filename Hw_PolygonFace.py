@@ -40,26 +40,31 @@ def ensure_directory_exists(path):
         print(f"目录 '{path}' 已创建。")
     else:
         print(f"目录 '{path}' 已存在。")
-def areaA_to_areaB_AffineTransform_By_points(pts_a,pts_b,a,b):
+def areaA_to_areaB_AffineTransform_By_points(pts_a, pts_b, a, b):
     M = cv2.getAffineTransform(pts_a, pts_b)
-
-    # 获取图像 b 的尺寸
     h_b, w_b = b.shape[:2]
 
-    # 应用仿射变换，将图像 a 中的三角形区域变换到图像 b 的三角形区域
-    transformed_triangle = cv2.warpAffine(a, M, (w_b, h_b))
+    # 1. 将输入图像转换为 float32 类型，避免类型不匹配
+    a_float = a.astype(np.float32)
+    b_float = b.astype(np.float32)
 
-    # 创建一个掩码，用于提取变换后的三角形区域
-    mask = np.zeros((h_b, w_b), dtype=np.uint8)  # 单通道掩码
-    cv2.fillConvexPoly(mask, np.int32(pts_b), 255)  # 在图像 b 的三角形区域创建掩码
+    transformed_triangle = cv2.warpAffine(a_float, M, (w_b, h_b))
 
-    # 将掩码扩展为 3 通道，以便与 transformed_triangle 进行按位与操作
-    mask_3ch = cv2.merge([mask, mask, mask])
+    # 3. 创建浮点型掩码（0.0~1.0），不进行高斯模糊
+    mask = np.zeros((h_b, w_b), dtype=np.float32)
+    cv2.fillConvexPoly(mask, np.int32(pts_b), 1.0)
+    mask = np.clip(mask, 0, 1)  # 确保值在 [0, 1] 范围内
+    mask_3ch = cv2.merge([mask, mask, mask])  # 扩展为 3 通道
 
-    # 将变换后的三角形区域融合到图像 b 中
-    result = cv2.bitwise_and(transformed_triangle, mask_3ch)  # 提取变换后的三角形区域
-    b = cv2.add(b, result)  # 将结果添加到图像 b 中
-    return b
+    # 4. 使用乘法混合（显式指定 dtype=np.float32）
+    transformed_part = cv2.multiply(transformed_triangle, mask_3ch, dtype=cv2.CV_32F)
+    background_part = cv2.multiply(b_float, 1.0 - mask_3ch, dtype=cv2.CV_32F)
+    blended = cv2.add(transformed_part, background_part)
+
+    # 5. 转换回 uint8 类型（如果原图是 8 位）
+    blended = np.clip(blended, 0, 255).astype(np.uint8)
+
+    return blended
 # 获取纹理图像的尺寸
 def project_points_to_plane(points, n, Q):
     """
@@ -183,7 +188,6 @@ def generate_FacadeTexture(mesh,texture_image,poly_Information):
     actual_Height = poly_Information['poly_ActualSize'][1]
     face_idxs = poly_Information['faces_idx']
     origin = poly_Information['origin']
-    center=poly_Information['center']
     R=poly_Information['basis']
     texture_pixels = np.array(texture_image.pixels).reshape((height, width, 4))
     texture_pixels = texture_pixels[::-1]
@@ -213,8 +217,8 @@ def generate_FacadeTexture(mesh,texture_image,poly_Information):
         # uvs = np.array([np.array(uv_layer.data[loop_index].uv) for loop_index in face.loop_indices])
         poly_points = []
         print("vertex_coords:",vertex_coords)
-        vertex_coords_projected = project_points_to_plane(vertex_coords, R[2], center)
-        for point in vertex_coords_projected:
+        # vertex_coords_projected = project_points_to_plane(vertex_coords, R[2], center)
+        for point in vertex_coords:
             x_pixel,y_pixel = point_To_pixelUV( point=point, 
                                                 actual_Height=actual_Height,
                                                 actual_Width=actual_Width,
@@ -307,12 +311,10 @@ def main():
         x_max=float("-inf")
         y_min=float("inf")
         y_max=float("-inf")
-        # center_group=np.array([np.array(mesh.vertices[v_idx].co) for v_idx in current_vertex_Set])
-        # center=np.mean(center_group,axis=0)
+   
         
         poly_vertices = np.array([np.array(mesh.vertices[v_idx].co) for v_idx in current_vertex_Set]) 
         print("vertices:",poly_vertices)
-        # vertices_projected = project_points_to_plane(vertices, z_axis, center)
         u=np.dot(poly_vertices, x_axis)
         v=np.dot(poly_vertices, y_axis)
         x_min=min(x_min, np.min(u))
@@ -345,46 +347,6 @@ def main():
                                     Q0=y_max_point,
                                     n=y_axis)           
         center=(r1+r2+r3+r4)/4
-        # for c_face in current_face_Set:
-        #     polygon = mesh.polygons[c_face]
-
-        #     vertices = np.array([np.array(mesh.vertices[idx].co) for idx in polygon.vertices])
-           
-        #     print("vertices:",vertices)
-        #     # vertices_projected = project_points_to_plane(vertices, z_axis, center)
-        #     u=np.dot(vertices, x_axis)
-        #     v=np.dot(vertices, y_axis)
-        #     x_min=min(x_min, np.min(u))
-        #     x_max=max(x_max, np.max(u))
-        #     y_min=min(y_min, np.min(v))
-        #     y_max=max(y_max, np.max(v))
-
-        #     x_min_idx = np.argmin(u)
-        #     x_max_idx = np.argmax(u)
-        #     y_min_idx = np.argmin(v)
-        #     y_max_idx = np.argmax(v)
-        #     x_min_point = vertices[x_min_idx]
-        #     x_max_point = vertices[x_max_idx]
-        #     y_min_point = vertices[y_min_idx]
-        #     y_max_point = vertices[y_max_idx]
-        #     r1=line_plane_intersection(P0=y_min_point,
-        #                                v=x_axis,
-        #                                Q0=x_min_point,
-        #                                n=x_axis)
-        #     r2=line_plane_intersection(P0=y_max_point,
-        #                                v=x_axis,
-        #                                Q0=x_max_point,
-        #                                n=x_axis)
-        #     r3=line_plane_intersection(P0=x_min_point,
-        #                                v=y_axis,
-        #                                Q0=y_min_point,
-        #                                n=y_axis)
-        #     r4=line_plane_intersection(P0=x_max_point,
-        #                                v=y_axis,
-        #                                Q0=y_max_point,
-        #                                n=y_axis)           
-        #     center=(r1+r2+r3+r4)/4
-         
     
         actual_width = x_max - x_min
         actual_height = y_max - y_min

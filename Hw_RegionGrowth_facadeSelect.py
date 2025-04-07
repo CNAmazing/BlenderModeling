@@ -56,7 +56,7 @@ def main():
                         
             current_len=len(current_face_Set)
         #创建新材质
-        color = (random.random(), random.random(), random.random(), 1.0)
+        color = (*((1.0, 0.0, random.random())[i] for i in random.sample([0, 1, 2], k=3)), 1.0)
         material = bpy.data.materials.new(name=f"FaceColor_{face.index}")
         material.diffuse_color = color
         mesh.materials.append(material)

@@ -77,13 +77,97 @@ import bpy
 # plt.savefig("output.png")
 
 
-import os
-import sys
-print("当前工作目录:", cwd)
-# script_path = os.path.abspath(__file__)
-cwd = os.getcwd()
-sys.path.append(cwd)
+# import os
+# import sys
+# print("当前工作目录:", cwd)
+# # script_path = os.path.abspath(__file__)
+# cwd = os.getcwd()
+# sys.path.append(cwd)
 
-print("当前Python模块搜索路径 (sys.path):")
-for path in sys.path:
-    print(path)
+# print("当前Python模块搜索路径 (sys.path):")
+# for path in sys.path:
+#     print(path)
+
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+"""
+含高斯模糊的仿射变换
+"""
+# def areaA_to_areaB_AffineTransform_By_points(pts_a, pts_b, a, b):
+#     M = cv2.getAffineTransform(pts_a, pts_b)
+#     h_b, w_b = b.shape[:2]
+
+#     # 1. 将输入图像转换为 float32 类型，避免类型不匹配
+#     a_float = a.astype(np.float32)
+#     b_float = b.astype(np.float32)
+
+#     # 2. 使用更高质量的插值方法（如 INTER_CUBIC）
+#     transformed_triangle = cv2.warpAffine(a_float, M, (w_b, h_b))
+
+#     # 3. 创建浮点型掩码（0.0~1.0），并做高斯模糊使边缘平滑
+#     mask = np.zeros((h_b, w_b), dtype=np.float32)
+#     cv2.fillConvexPoly(mask, np.int32(pts_b), 1.0)
+#     mask = cv2.GaussianBlur(mask, (3, 3), 0)  # 边缘模糊，使过渡更自然
+#     mask = np.clip(mask, 0, 1)  # 确保值在 [0, 1] 范围内
+#     mask_3ch = cv2.merge([mask, mask, mask])  # 扩展为 3 通道
+
+#     # 4. 使用乘法混合（显式指定 dtype=np.float32）
+#     transformed_part = cv2.multiply(transformed_triangle, mask_3ch, dtype=cv2.CV_32F)
+#     background_part = cv2.multiply(b_float, 1.0 - mask_3ch, dtype=cv2.CV_32F)
+#     blended = cv2.add(transformed_part, background_part)
+
+#     # 5. 转换回 uint8 类型（如果原图是 8 位）
+#     blended = np.clip(blended, 0, 255).astype(np.uint8)
+
+#     return blended
+"""
+无高斯模糊的仿射变换
+"""
+def areaA_to_areaB_AffineTransform_By_points(pts_a, pts_b, a, b):
+    M = cv2.getAffineTransform(pts_a, pts_b)
+    h_b, w_b = b.shape[:2]
+
+    # 1. 将输入图像转换为 float32 类型，避免类型不匹配
+    a_float = a.astype(np.float32)
+    b_float = b.astype(np.float32)
+
+    transformed_triangle = cv2.warpAffine(a_float, M, (w_b, h_b))
+
+    # 3. 创建浮点型掩码（0.0~1.0），不进行高斯模糊
+    mask = np.zeros((h_b, w_b), dtype=np.float32)
+    cv2.fillConvexPoly(mask, np.int32(pts_b), 1.0)
+    mask = np.clip(mask, 0, 1)  # 确保值在 [0, 1] 范围内
+    mask_3ch = cv2.merge([mask, mask, mask])  # 扩展为 3 通道
+
+    # 4. 使用乘法混合（显式指定 dtype=np.float32）
+    transformed_part = cv2.multiply(transformed_triangle, mask_3ch, dtype=cv2.CV_32F)
+    background_part = cv2.multiply(b_float, 1.0 - mask_3ch, dtype=cv2.CV_32F)
+    blended = cv2.add(transformed_part, background_part)
+
+    # 5. 转换回 uint8 类型（如果原图是 8 位）
+    blended = np.clip(blended, 0, 255).astype(np.uint8)
+
+    return blended
+
+imageA=cv2.imread(r'E:\WorkSpace\BlenderModeling\output\00472\images\poly0.jpg')
+imageA=cv2.cvtColor(imageA, cv2.COLOR_BGR2RGB)  # 将图像 A 转换为 RGB 格式
+imageB=np.zeros((imageA.shape[0],imageA.shape[1],3),dtype=np.uint8)  # 创建一个与图像 A 相同大小的空白图像 B
+pts_a = np.array([[0, 0], [300, 0], [0, 300]], dtype=np.float32)  # 图像 a 中的三角形顶点
+pts_b = np.array([[0, 0], [300, 0], [0, 300]], dtype=np.float32)  # 图像 b 中的三角形顶点
+
+result=areaA_to_areaB_AffineTransform_By_points(pts_a,pts_b,imageA,imageB)
+pts_a = np.array([ [300, 0], [0, 300],[300, 300]], dtype=np.float32)  # 图像 a 中的三角形顶点
+pts_b = np.array([[300, 0], [0, 300],[300, 300]], dtype=np.float32)  # 图像 b 中的三角形顶点
+result=areaA_to_areaB_AffineTransform_By_points(pts_a,pts_b,imageA,result)
+plt.figure(figsize=(10, 5))
+plt.subplot(1, 3, 1)
+plt.imshow(imageA)
+plt.title("Image A")
+plt.subplot(1, 3, 2)
+plt.imshow(imageB)
+plt.title("Image B")
+plt.subplot(1, 3, 3)
+plt.imshow(result)
+plt.title("Image B")
+plt.show()
