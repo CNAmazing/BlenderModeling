@@ -7,7 +7,7 @@ sys.path.append(cwd)
 from Hw_Tools import *
 
 def main():
-    obj_name=OBJ_NAME
+    obj_name='keep'
     obj = bpy.data.objects.get(obj_name)
 
     if obj is None:

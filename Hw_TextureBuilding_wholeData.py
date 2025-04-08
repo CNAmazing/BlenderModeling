@@ -11,8 +11,8 @@ from Hw_Tools import *
 
       
 def main():
-
-    folder_path=FOLDER_PATH
+    obj_name = 'no_keep'
+    folder_path=os.path.join('output',obj_name)
     total_classes=['window','door','glass']
     json_path=os.path.join(folder_path,'data.json')
     data=read_json(json_path)
@@ -155,7 +155,10 @@ def main():
     for polygonPlane in polygonPlaneList:
 
         for cls in polygonPlane.classes:
-            c_poly_idxs=data[polygonPlane.poly_idx][f"{cls}_poly_idxs"]
+            try:
+                c_poly_idxs=data[polygonPlane.poly_idx][f"{cls}_poly_idxs"]
+            except KeyError:
+                continue
             for face_index in c_poly_idxs:
                 face = mesh.polygons[face_index]
 
@@ -174,21 +177,20 @@ def main():
     
     for polygonPlane in polygonPlaneList:
         poly_idx=polygonPlane.poly_idx
-        image_path=os.path.join(folder_path,'images',poly_idx+'.jpg')
-        normalImage_path=os.path.join(folder_path,'images',poly_idx+'_normal.jpg')
         
-        image_=bpy.data.images.load(image_path)
-        image_normal=bpy.data.images.load(normalImage_path)
-
+        image_path=os.path.join(r'E:\hhhh\BlenderModeling\output\no_keep','images',poly_idx+'.jpg')
+        normalImage_path=os.path.join(r'E:\hhhh\BlenderModeling\output\no_keep','images',poly_idx+'_normal.jpg')
+        # image_path='output'+'/'+obj_name+'/'+'images'+'/'+poly_idx+'.jpg'
+        # normalImage_path='output'+'/'+obj_name+'/'+'images'+'/'+poly_idx+'_normal.jpg'
         material=bpy.data.materials.new(f"{poly_idx}")  
         material.use_nodes = True
         # 创建图像纹理节点
         image_texture = material.node_tree.nodes.new(type='ShaderNodeTexImage')
         # 加载图像
-        image_texture.image = image_
+        image_texture.image = bpy.data.images.load(image_path)
 
         normalImage_texture=material.node_tree.nodes.new(type='ShaderNodeTexImage')
-        normalImage_texture.image=image_normal
+        normalImage_texture.image=bpy.data.images.load(normalImage_path)
         # 获取纹理坐标节点
         texture_coord = material.node_tree.nodes.new(type='ShaderNodeTexCoord')
         # 获取Principled BSDF节点
@@ -198,12 +200,15 @@ def main():
         # 连接图像纹理到 Principled BSDF 的 Base Color
         material.node_tree.links.new(image_texture.outputs['Color'], principled_bsdf.inputs['Base Color'])    
         material.node_tree.links.new(normalImage_texture.outputs['Color'], principled_bsdf.inputs['Normal'])
-        # principled_bsdf.inputs['Metallic'].default_value = 0.0 # 设置金属度，0.0为非金属，1.0为金属 
-        # principled_bsdf.inputs['Roughness'].default_value = 0.0  # 设置粗糙度，0.0为光滑，1.0为粗糙
+        principled_bsdf.inputs['Metallic'].default_value =0.5 # 设置金属度，0.0为非金属，1.0为金属 
+        principled_bsdf.inputs['Roughness'].default_value = 1.0  # 设置粗糙度，0.0为光滑，1.0为粗糙
         
         obj.data.materials.append(material)
         for cls in polygonPlane.classes:
-            c_poly_idxs=data[poly_idx][f"{cls}_poly_idxs"]
+            try:
+                c_poly_idxs=data[poly_idx][f"{cls}_poly_idxs"]
+            except KeyError:
+                continue
             for face_index in c_poly_idxs:
                 add_material_by_faceIdx(obj,face_index,poly_idx)
     # #连接法线贴图 并修改粗糙度
@@ -239,5 +244,5 @@ def main():
     # obj.data.materials.append(material)
     # for face_index in glass_poly_idxs:
     #     add_material_by_faceIdx(obj,face_index,"glassMaterial")    
-
+    print('Done!')
 main()

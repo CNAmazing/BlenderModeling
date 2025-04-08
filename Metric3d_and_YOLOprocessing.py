@@ -449,7 +449,8 @@ CLASS_NAMES = {
 }
 TOTAL_CLASSES=['window','door','glass']
 def main():
-    input_folder = FOLDER_PATH
+    obj_name = 'no_keep'
+    input_folder =  os.path.join('output',obj_name)
     jps_paths,basenames=get_jpg_paths(input_folder)
     json_path=os.path.join(input_folder,'data.json')
     poly_dict=read_json(json_path)

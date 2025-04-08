@@ -243,8 +243,9 @@ def generate_FacadeTexture(mesh,texture_image,poly_Information):
         FacadeTexture=areaA_to_areaB_AffineTransform_By_points(uv_points, poly_points,  texture_pixels_bgr,FacadeTexture)
     return FacadeTexture 
 def main():
-    output_path = FOLDER_PATH
-    obj_name = OBJ_NAME
+    obj_name = 'no_keep'
+    output_path = os.path.join('output',obj_name)
+    
     # 确保在对象模式下
     bpy.ops.object.mode_set(mode='OBJECT')
     # 获取名为“x”的物体
@@ -366,6 +367,7 @@ def main():
                                     n=y_axis)           
         center=(r1+r2+r3+r4)/4
         polygonPlane=PolygonPlane(np.array(z_axis), np.array(center))
+        print('current_face_Set:',current_face_Set)
         for face_index in current_face_Set:
             vertices = [mesh.vertices[idx].co for idx in mesh.polygons[face_index].vertices]
             # 判断面片是否在平面上

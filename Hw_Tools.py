@@ -4,7 +4,7 @@ import bpy
 import json
 import os
 
-OBJ_NAME='002'
+OBJ_NAME='Cube'
 FOLDER_PATH=os.path.join('output',OBJ_NAME)
 
 def xyxy_to_xywh(bboxes):
