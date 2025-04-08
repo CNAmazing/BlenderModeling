@@ -243,8 +243,8 @@ def generate_FacadeTexture(mesh,texture_image,poly_Information):
         FacadeTexture=areaA_to_areaB_AffineTransform_By_points(uv_points, poly_points,  texture_pixels_bgr,FacadeTexture)
     return FacadeTexture 
 def main():
-    output_path = "output"
-    obj_name = "001"
+    output_path = FOLDER_PATH
+    obj_name = OBJ_NAME
     # 确保在对象模式下
     bpy.ops.object.mode_set(mode='OBJECT')
     # 获取名为“x”的物体
@@ -299,9 +299,27 @@ def main():
                             current_vertex_Set.add(e[1])
             current_len=len(current_face_Set)
         
+        def closest_orthogonal_vector(n):
+            a, b, c = n
+            norm_n_squared = a**2 + b**2 + c**2
+            if norm_n_squared == 0:
+                raise ValueError("平面法向量不能为零向量")
+            x = -a * c / norm_n_squared
+            y = -b * c / norm_n_squared
+            z = (a**2 + b**2) / norm_n_squared
+            return np.array([x, y, z])
+        z_axis=np.array(normal)
+        y_axis=closest_orthogonal_vector(z_axis)
+
+        # # 计算 z 在 n 方向的投影
+        # proj_z_on_n = (np.dot(y_axis, z_axis) / np.dot(z_axis, z_axis)) * z_axis
         
-        y_axis=np.array([0,0,1])
-        z_axis=normal
+        # # 最优解：z 减去其在 n 方向的投影
+        # y_axis = z_axis - proj_z_on_n
+        
+
+
+
         x_axis=np.cross(y_axis,z_axis) 
         
         x_axis=x_axis/np.linalg.norm(x_axis)
@@ -347,7 +365,13 @@ def main():
                                     Q0=y_max_point,
                                     n=y_axis)           
         center=(r1+r2+r3+r4)/4
-    
+        polygonPlane=PolygonPlane(np.array(z_axis), np.array(center))
+        for face_index in current_face_Set:
+            vertices = [mesh.vertices[idx].co for idx in mesh.polygons[face_index].vertices]
+            # 判断面片是否在平面上
+            if all(is_point_on_plane(point, polygonPlane.facade_plane_equation) for point in vertices):
+                print("当前面片在平面上")
+                
         actual_width = x_max - x_min
         actual_height = y_max - y_min
         
@@ -372,17 +396,17 @@ def main():
 
     print("polygons_Parameterization:",polygons_Parameterization)
     texture_image = get_texture_image_by_object(obj)
-    ensure_directory_exists(os.path.join(output_path,obj_name,"images"))
+    ensure_directory_exists(os.path.join(output_path,"images"))
     if texture_image:
         for key,value in polygons_Parameterization.items():
             # save_texture_for_faces(mesh, value['faces_idx'], texture_image, f"{key}.png")
             FacadeTexture=generate_FacadeTexture(mesh,texture_image,value)
             print(f"当前将保存{key}")
             
-            polyImageName=os.path.join(output_path,obj_name,"images",f"{key}.jpg")
+            polyImageName=os.path.join(output_path,"images",f"{key}.jpg")
             cv2.imwrite(polyImageName, FacadeTexture)
             
-    json_path=os.path.join(output_path,obj_name,"data.json")
+    json_path=os.path.join(output_path,"data.json")
     with open(json_path, "w") as json_file:
         json.dump(polygons_Parameterization, json_file, indent=4)
     print('Done!')

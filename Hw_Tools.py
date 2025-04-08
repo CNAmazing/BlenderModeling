@@ -3,6 +3,10 @@ import numpy as np
 import bpy
 import json
 import os
+
+OBJ_NAME='002'
+FOLDER_PATH=os.path.join('output',OBJ_NAME)
+
 def xyxy_to_xywh(bboxes):
     array=[]
     for bbox in bboxes:
@@ -66,6 +70,7 @@ class PolygonPlane():
         self.actual_width=None
         self.actual_height=None
         self.classes=None
+        self.poly_idx=None
     @property
     def facade_plane_equation(self):
         return self.plane_equation(self.normal, self.original_point)
@@ -85,7 +90,6 @@ class PolygonPlane():
             raise ValueError("glass_depth is None")
         return self.plane_equation(self.normal, self.original_point-self.glass_depth*self.normal-self.window_depth*self.normal)
     def point_to_UV(self,point):
-        
         """
         R已经转置 每一列是一个基向量
         将三维点转换为UV坐标
@@ -105,10 +109,8 @@ class PolygonPlane():
         """
         A, B, C = normal_vector
         x0, y0, z0 = point
-        
         # 计算 D
         D = -(A * x0 + B * y0 + C * z0)
-        
         return A, B, C, D   
 def compute_centroid(points):
     """

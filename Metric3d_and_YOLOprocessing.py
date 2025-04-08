@@ -118,7 +118,7 @@ def Metric3d_Processing(onnx_model=None, input_image=None):
     # plt.imshow(rgb_image)
     # plt.show()
     normal_output_Path= os.path.join(dir_path, f"{name_without_ext}_normal.jpg")
-    depth_output_Path= os.path.join(dir_path, f"{name_without_ext}_depth.jpg")
+    depth_output_Path= os.path.join(dir_path, f"{name_without_ext}_depth.tiff")
     cv2.imwrite(normal_output_Path, normal)
     cv2.imwrite(depth_output_Path, depth)
 
@@ -449,7 +449,7 @@ CLASS_NAMES = {
 }
 TOTAL_CLASSES=['window','door','glass']
 def main():
-    input_folder = r"output\001"
+    input_folder = FOLDER_PATH
     jps_paths,basenames=get_jpg_paths(input_folder)
     json_path=os.path.join(input_folder,'data.json')
     poly_dict=read_json(json_path)

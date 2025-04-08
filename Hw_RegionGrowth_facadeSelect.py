@@ -7,10 +7,11 @@ sys.path.append(cwd)
 from Hw_Tools import *
 
 def main():
-    obj = bpy.data.objects.get("Cube")
+    obj_name=OBJ_NAME
+    obj = bpy.data.objects.get(obj_name)
 
     if obj is None:
-        raise ValueError("未找到名为 'Cube' 的物体")
+        raise ValueError(f"未找到名为 {obj_name} 的物体")
 
     # 确保物体是网格类型
     if obj.type != 'MESH':

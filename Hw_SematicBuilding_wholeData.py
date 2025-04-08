@@ -10,7 +10,7 @@ sys.path.append(cwd)
 from Hw_Tools import *
 def main():
 
-    folder_path=r'E:\WorkSpace\BlenderModeling\output\00472'
+    folder_path=r'output\001'
     total_classes=['window','door','glass']
     json_path=os.path.join(folder_path,'data.json')
     data=read_json(json_path)
@@ -45,14 +45,14 @@ def main():
     for poly_idx,poly_info in data.items():
         print(f'正在处理多边形面片:{poly_idx}')
         image_path=os.path.join(folder_path,'images',poly_idx+'.jpg')
-        depthImage_path=os.path.join(folder_path,'images',poly_idx+'_depth.jpg')
+        depthImage_path=os.path.join(folder_path,'images',poly_idx+'_depth.tiff')
         current_classes=[cls for cls in total_classes if cls in poly_info]
         
             
         #blender读取图片顺序是从左下角开始，而numpy读取图片是从左上角开始
         image = cv2.imread(image_path)
         image_height,image_width,_=image.shape
-        depthImage=cv2.imread(depthImage_path)
+        depthImage=cv2.imread(depthImage_path,cv2.IMREAD_UNCHANGED)
         depth_Dict={}
         for cls in total_classes:
             if cls in current_classes:
