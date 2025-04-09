@@ -48,6 +48,7 @@ def main():
         image_path=os.path.join(folder_path,'images',poly_idx+'.jpg')
         normalImage_path=os.path.join(folder_path,'images',poly_idx+'_normal.jpg')
         depthImage_path=os.path.join(folder_path,'images',poly_idx+'_depth.tiff')
+        roughnessImage_path=os.path.join(folder_path,'images',poly_idx+'_roughness.jpg')
         current_classes=[cls for cls in total_classes if cls in poly_info]
         # for cls in current_classes:
         #     poly_info[cls]=xyxy_to_xywh(poly_info[cls])
@@ -70,6 +71,10 @@ def main():
                     depth_Dict[key]=depth_Dict[key] & ~depth_Dict['window'] & ~depth_Dict['door']
                 case 'window':
                     depth_Dict[key]=depth_Dict[key] & ~depth_Dict['glass'] 
+                case 'glass':
+                    roughnessMap = np.where(~depth_Dict[key], 255, 0).astype(np.uint8)
+                    # 保存图像
+                    cv2.imwrite(roughnessImage_path, roughnessMap)
         threshold=10
         poly_info['facadeDepth']=np.mean(depthImage[depth_Dict['facade']])/threshold
         
@@ -177,9 +182,10 @@ def main():
     
     for polygonPlane in polygonPlaneList:
         poly_idx=polygonPlane.poly_idx
-        
-        image_path=os.path.join(r'E:\hhhh\BlenderModeling\output\no_keep','images',poly_idx+'.jpg')
-        normalImage_path=os.path.join(r'E:\hhhh\BlenderModeling\output\no_keep','images',poly_idx+'_normal.jpg')
+        path=r'E:\WorkSpace\BlenderModeling\output\no_keep'
+        image_path=os.path.join(path,'images',poly_idx+'.jpg')
+        normalImage_path=os.path.join(path,'images',poly_idx+'_normal.jpg')
+        roughnessImage_path=os.path.join(path,'images',poly_idx+'_roughness.jpg')
         # image_path='output'+'/'+obj_name+'/'+'images'+'/'+poly_idx+'.jpg'
         # normalImage_path='output'+'/'+obj_name+'/'+'images'+'/'+poly_idx+'_normal.jpg'
         material=bpy.data.materials.new(f"{poly_idx}")  
@@ -191,19 +197,32 @@ def main():
 
         normalImage_texture=material.node_tree.nodes.new(type='ShaderNodeTexImage')
         normalImage_texture.image=bpy.data.images.load(normalImage_path)
+        roughnessImage_texture=material.node_tree.nodes.new(type='ShaderNodeTexImage')
+        roughnessImage_texture.image=bpy.data.images.load(roughnessImage_path)
         # 获取纹理坐标节点
         texture_coord = material.node_tree.nodes.new(type='ShaderNodeTexCoord')
         # 获取Principled BSDF节点
         principled_bsdf = material.node_tree.nodes.get("原理化 BSDF")
         # 连接纹理坐标到图像纹理节点
         material.node_tree.links.new(texture_coord.outputs['UV'], image_texture.inputs['Vector'])
+        material.node_tree.links.new(texture_coord.outputs['UV'], normalImage_texture.inputs['Vector'])
+        material.node_tree.links.new(texture_coord.outputs['UV'], roughnessImage_texture.inputs['Vector'])
         # 连接图像纹理到 Principled BSDF 的 Base Color
         material.node_tree.links.new(image_texture.outputs['Color'], principled_bsdf.inputs['Base Color'])    
-        material.node_tree.links.new(normalImage_texture.outputs['Color'], principled_bsdf.inputs['Normal'])
+        # material.node_tree.links.new(normalImage_texture.outputs['Color'], principled_bsdf.inputs['Normal'])
+        material.node_tree.links.new(roughnessImage_texture.outputs['Color'], principled_bsdf.inputs['Roughness'])
         principled_bsdf.inputs['Metallic'].default_value =0.5 # 设置金属度，0.0为非金属，1.0为金属 
-        principled_bsdf.inputs['Roughness'].default_value = 1.0  # 设置粗糙度，0.0为光滑，1.0为粗糙
+        # principled_bsdf.inputs['Roughness'].default_value = 1.0  # 设置粗糙度，0.0为光滑，1.0为粗糙
+        blenderNode=material.node_tree.nodes.new(type='ShaderNodeMix')
+        blenderNode.data_type = 'RGBA'
+        material.node_tree.links.new(roughnessImage_texture.outputs['Color'], blenderNode.inputs[0])
+        blenderNode.inputs[6].default_value=(0.5, 0.5, 1.0, 1.0) # 设置颜色
+        material.node_tree.links.new(normalImage_texture.outputs['Color'], blenderNode.inputs[7])
+        output_node =  material.node_tree.nodes.get('材质输出')
+        material.node_tree.links.new(blenderNode.outputs['Result'], output_node.inputs['Displacement'])
         
         obj.data.materials.append(material)
+        
         for cls in polygonPlane.classes:
             try:
                 c_poly_idxs=data[poly_idx][f"{cls}_poly_idxs"]
@@ -211,38 +230,7 @@ def main():
                 continue
             for face_index in c_poly_idxs:
                 add_material_by_faceIdx(obj,face_index,poly_idx)
-    # #连接法线贴图 并修改粗糙度
-    # base_texture=obj.material_slots[0].material
-    # normal_texture = base_texture.node_tree.nodes.new(type='ShaderNodeTexImage')
-    # normal_texture.image = bpy.data.images.load(normalImage_path)
-    # normal_principled_bsdf = base_texture.node_tree.nodes.get("原理化 BSDF")
-    # normal_principled_bsdf.inputs['Roughness'].default_value =1.0
-    # base_texture.node_tree.links.new(normal_texture.outputs['Color'], normal_principled_bsdf.inputs['Normal'])
-
-    # #创建玻璃材质 
-    # image_blender=bpy.data.images.load(image_path)
-    # material=bpy.data.materials.new("glassMaterial")  
-    # material.use_nodes = True
-    # # 获取材质的节点树
-    # nodes = material.node_tree.nodes
-    # # 创建图像纹理节点
-    # image_texture = nodes.new(type='ShaderNodeTexImage')
-    # # 加载图像
-    # image_texture.image = image_blender
-    # # 获取纹理坐标节点
-    # texture_coord = nodes.new(type='ShaderNodeTexCoord')
-    # # 获取Principled BSDF节点
-    # principled_bsdf = nodes.get("原理化 BSDF")
-    # # 连接纹理坐标到图像纹理节点
-    # material.node_tree.links.new(texture_coord.outputs['UV'], image_texture.inputs['Vector'])
-    # # 连接图像纹理到 Principled BSDF 的 Base Color
-    # material.node_tree.links.new(image_texture.outputs['Color'], principled_bsdf.inputs['Base Color'])    
-    # principled_bsdf.inputs['Metallic'].default_value = 0.0 # 设置金属度，0.0为非金属，1.0为金属 
-    # principled_bsdf.inputs['Roughness'].default_value = 0.0  # 设置粗糙度，0.0为光滑，1.0为粗糙
-    
-    # 将材质应用到选中的物体
-    # obj.data.materials.append(material)
-    # for face_index in glass_poly_idxs:
-    #     add_material_by_faceIdx(obj,face_index,"glassMaterial")    
+    mesh.uv_layers[uv_layer_name].active_render = True
+   
     print('Done!')
 main()
