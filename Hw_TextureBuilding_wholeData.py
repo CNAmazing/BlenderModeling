@@ -11,7 +11,7 @@ from Hw_Tools import *
 
       
 def main():
-    obj_name = 'no_keep'
+    obj_name = '003_LOD'
     folder_path=os.path.join('output',obj_name)
     total_classes=['window','door','glass']
     json_path=os.path.join(folder_path,'data.json')
@@ -53,7 +53,7 @@ def main():
         # for cls in current_classes:
         #     poly_info[cls]=xyxy_to_xywh(poly_info[cls])
 
-            
+        mask=poly_info['mask']    
         #blender读取图片顺序是从左下角开始，而numpy读取图片是从左上角开始
         image = cv2.imread(image_path)
         image_height,image_width,_=image.shape
@@ -68,9 +68,9 @@ def main():
         for key,value in depth_Dict.items():
             match key:
                 case 'facade':
-                    depth_Dict[key]=depth_Dict[key] & ~depth_Dict['window'] & ~depth_Dict['door']
+                    depth_Dict[key]=mask&depth_Dict[key] & ~depth_Dict['window'] & ~depth_Dict['door']
                 case 'window':
-                    depth_Dict[key]=depth_Dict[key] & ~depth_Dict['glass'] 
+                    depth_Dict[key]=mask&depth_Dict[key] & ~depth_Dict['glass'] 
                 case 'glass':
                     roughnessMap = np.where(~depth_Dict[key], 255, 0).astype(np.uint8)
                     # 保存图像
@@ -90,7 +90,8 @@ def main():
             
         if 'glass' in current_classes:
             poly_info['glassDepth']=poly_info['glassDepth']-poly_info['windowDepth']
-        print(f'poly_info:{poly_info}')
+        filtered_info = {k: v for k, v in poly_info.items() if k != 'mask'}
+        print(f'poly_info:{filtered_info}')
         """
         主程序阶段
         """
@@ -151,9 +152,14 @@ def main():
     """
     调整UV
     """
-    
     uv_layer_name = "UVMap"  
     mesh = obj.data
+
+    # if uv_layer_name not in mesh.uv_layers:
+    #     print(f"错误：UV 层 '{uv_layer_name}' 不存在！")
+    #     print(f"可用的 UV 层：{[layer.name for layer in mesh.uv_layers]}")
+    #     # 可以选择创建一个新的 UV 层或使用默认层
+    #     uv_layer_name = mesh.uv_layers.new(name=uv_layer_name).name
     uv_layer = mesh.uv_layers[uv_layer_name]
     mesh.uv_layers.active = uv_layer
 
@@ -182,7 +188,7 @@ def main():
     
     for polygonPlane in polygonPlaneList:
         poly_idx=polygonPlane.poly_idx
-        path=r'E:\WorkSpace\BlenderModeling\output\no_keep'
+        path=r'E:\hhhh\BlenderModeling\output\003_LOD'
         image_path=os.path.join(path,'images',poly_idx+'.jpg')
         normalImage_path=os.path.join(path,'images',poly_idx+'_normal.jpg')
         roughnessImage_path=os.path.join(path,'images',poly_idx+'_roughness.jpg')

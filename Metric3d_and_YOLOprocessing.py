@@ -449,7 +449,7 @@ CLASS_NAMES = {
 }
 TOTAL_CLASSES=['window','door','glass']
 def main():
-    obj_name = 'no_keep'
+    obj_name = '003_LOD'
     input_folder =  os.path.join('output',obj_name)
     jps_paths,basenames=get_jpg_paths(input_folder)
     json_path=os.path.join(input_folder,'data.json')

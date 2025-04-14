@@ -205,6 +205,8 @@ def generate_FacadeTexture(mesh,texture_image,poly_Information):
         uv_layer = mesh.uv_layers.new(name=uv_layer_name)
         mesh.uv_layers.active = uv_layer
     FacadeTexture = np.zeros((poly_Height, poly_Width, 3), dtype=np.uint8)
+    FacadeTexture_uint8 = np.zeros((poly_Height, poly_Width), dtype=np.uint8)
+    
     for face_idx in face_idxs:
         face = mesh.polygons[face_idx]
         vertex_coords = np.array([np.array(mesh.vertices[vertex_idx].co) for vertex_idx in face.vertices])
@@ -241,9 +243,13 @@ def generate_FacadeTexture(mesh,texture_image,poly_Information):
         poly_points: 多边形坐标点
         """
         FacadeTexture=areaA_to_areaB_AffineTransform_By_points(uv_points, poly_points,  texture_pixels_bgr,FacadeTexture)
-    return FacadeTexture 
+        print('poly_points:',poly_points)  
+        poly_points_INT = np.int32(poly_points) 
+        FacadeTexture_uint8=cv2.fillPoly(FacadeTexture_uint8, poly_points_INT, color=255)
+        mask = FacadeTexture_uint8.astype(bool)
+    return FacadeTexture ,mask
 def main():
-    obj_name = 'no_keep'
+    obj_name = '003_LOD'
     output_path = os.path.join('output',obj_name)
     
     # 确保在对象模式下
@@ -368,11 +374,14 @@ def main():
         center=(r1+r2+r3+r4)/4
         polygonPlane=PolygonPlane(np.array(z_axis), np.array(center))
         print('current_face_Set:',current_face_Set)
+        face_not_in_plane = len(current_face_Set)
         for face_index in current_face_Set:
             vertices = [mesh.vertices[idx].co for idx in mesh.polygons[face_index].vertices]
             # 判断面片是否在平面上
             if all(is_point_on_plane(point, polygonPlane.facade_plane_equation) for point in vertices):
                 print("当前面片在平面上")
+                face_not_in_plane -= 1
+        print(f"共有{face_not_in_plane}面片不在平面上")
                 
         actual_width = x_max - x_min
         actual_height = y_max - y_min
@@ -402,9 +411,9 @@ def main():
     if texture_image:
         for key,value in polygons_Parameterization.items():
             # save_texture_for_faces(mesh, value['faces_idx'], texture_image, f"{key}.png")
-            FacadeTexture=generate_FacadeTexture(mesh,texture_image,value)
+            FacadeTexture,mask=generate_FacadeTexture(mesh,texture_image,value)
             print(f"当前将保存{key}")
-            
+            polygons_Parameterization[key]['mask']=mask.tolist()
             polyImageName=os.path.join(output_path,"images",f"{key}.jpg")
             cv2.imwrite(polyImageName, FacadeTexture)
             
