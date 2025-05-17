@@ -249,7 +249,7 @@ def generate_FacadeTexture(mesh,texture_image,poly_Information):
         mask = FacadeTexture_uint8.astype(bool)
     return FacadeTexture ,mask
 def main():
-    obj_name = '003_LOD'
+    obj_name = 'no_keep'
     output_path = os.path.join('output',obj_name)
     
     # 确保在对象模式下

@@ -11,7 +11,7 @@ from Hw_Tools import *
 
       
 def main():
-    obj_name = '003_LOD'
+    obj_name = 'no_keep'
     folder_path=os.path.join('output',obj_name)
     total_classes=['window','door','glass']
     json_path=os.path.join(folder_path,'data.json')
@@ -188,7 +188,7 @@ def main():
     
     for polygonPlane in polygonPlaneList:
         poly_idx=polygonPlane.poly_idx
-        path=r'E:\hhhh\BlenderModeling\output\003_LOD'
+        path=r'E:\WorkSpace\BlenderModeling\output\no_keep'
         image_path=os.path.join(path,'images',poly_idx+'.jpg')
         normalImage_path=os.path.join(path,'images',poly_idx+'_normal.jpg')
         roughnessImage_path=os.path.join(path,'images',poly_idx+'_roughness.jpg')

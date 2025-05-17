@@ -7,7 +7,40 @@ import os
 cwd = os.getcwd()
 sys.path.append(cwd)
 from Hw_Tools import *
-
+def get_jpg_paths(folder_name):
+    """
+    获取指定文件夹下images子目录中的所有.jpg图片路径及不带后缀的文件名
+    
+    参数:
+        folder_name (str): 目标文件夹名称（如"x"）
+        
+    返回:
+        tuple: (完整路径列表, 不带后缀的文件名列表)，如(
+                ["x/images/pic1.jpg", "x/images/pic2.jpg"], 
+                ["pic1", "pic2"]
+               )
+    """
+    full_paths = []
+    basenames = []
+    
+    try:
+        images_dir = folder_name
+        if not os.path.exists(images_dir):
+            raise FileNotFoundError(f"目录不存在: {images_dir}")
+            
+        for f in os.listdir(images_dir):
+            if f.lower().endswith(".jpg"):
+                file_path = os.path.join(images_dir, f)
+                if os.path.isfile(file_path):
+                    full_paths.append(file_path)
+                    # 去掉.jpg后缀获取纯文件名
+                    basenames.append(os.path.splitext(f)[0])
+                    
+        return full_paths, basenames
+        
+    except Exception as e:
+        print(f"错误: {e}")
+        return [], []
 def add_material_by_faceIdx(obj,faceIdx,material_name):
     """
     为物体的指定面添加材质
@@ -52,14 +85,12 @@ def face_select_by_normal(v1,v2=(0,0,1),tolerance_degrees=1):
     
     # 判断是否正交
     return abs(angle_deg - 90) < tolerance_degrees
-def main():
-# 删除场景中所有现有对象
+def image_to_model(image_path):
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete(use_global=False)
 
     # 创建一个正方体
     bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0, 0))
-    image_path=r"E:\Desktop\facade\00472.jpg"
     basename=get_basename_without_suffix(image_path)
     image=cv2.imread(image_path)
     height,width,channal=image.shape
@@ -130,8 +161,42 @@ def main():
 
         add_material_by_faceIdx(obj,poly.index,"MyMaterial")
     mesh.uv_layers['UVMap'].active_render = True
-        # for loop_index in poly.loop_indices:
-        #         vertex_index = mesh.loops[loop_index].vertex_index
-        #         vertex_co = obj.data.vertices[vertex_index].co
-        #         print(f"  Loop Index: {loop_index}, Vertex Index: {vertex_index}, Vertex Coordinates: {vertex_co}")
+def export_obj(obj_name, export_path):
+        # 确保物体存在
+    if obj_name not in bpy.data.objects:
+        raise Exception(f"名为 {obj_name} 的物体不存在")
+
+    # 设置导出路径（默认保存到 blend 文件所在目录）
+
+    # 选中目标物体（取消其他选择）
+    bpy.ops.object.select_all(action='DESELECT')
+    bpy.data.objects[obj_name].select_set(True)
+
+   
+    bpy.ops.wm.obj_export(
+        filepath=export_path,
+        forward_axis='X',
+        up_axis='Z',
+        export_selected_objects=True,
+        )
+    print(f"成功导出到: {export_path}")
+def clear_all_materials():
+    """清除 Blender 中所有材质"""
+    for material in list(bpy.data.materials):
+          # 使用 list() 避免修改集合时的迭代问题
+            bpy.data.materials.remove(material)
+def main():
+    input_folder = r"E:\Desktop\facadeData"
+    jps_paths,basenames=get_jpg_paths(input_folder)
+    for jpg_path,basename in zip(jps_paths,basenames):
+        clear_all_materials()
+        image_to_model(jpg_path)
+        export_path = os.path.join(input_folder, f"{basename}.obj")
+        export_obj(basename, export_path)
+    # clear_all_materials()
+    # image_path=r"E:\Desktop\facadeData\00472.jpg"
+    # basename=image_to_model(image_path)
+    # export_path = bpy.path.abspath(f"E:/Desktop/facadeData/{basename}.obj")
+    # export_obj(basename, export_path)
+    
 main()
